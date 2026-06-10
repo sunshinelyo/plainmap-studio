@@ -108,13 +108,64 @@ textarea { resize: vertical; min-height: 56px; }
 .search-results { display: grid; gap: 4px; }
 .search-results button { cursor: pointer; text-align: left; border: 0; border-radius: 5px; padding: 7px; background: #f2f0ea; font-size: 11px; }
 .card-list { display: grid; gap: 8px; }
-.editor-card { border: 1px solid #d7d2c7; border-radius: 9px; padding: 9px; background: #fbfaf7; }
-.editor-card-header { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+.editor-card { border: 1px solid #d7d2c7; border-radius: 9px; padding: 7px; background: #fbfaf7; }
+.editor-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  cursor: pointer;
+}
+.editor-card.expanded .editor-card-header { margin-bottom: 9px; }
 .drag-handle { cursor: grab; font-weight: 900; color: #8b867a; letter-spacing: -2px; }
-.marker-preview { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 50%; border: 2px solid var(--ink); font-weight: 900; font-size: 11px; }
-.marker-preview .material-symbols-outlined { font-size: 16px; }
-.editor-card-header strong { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.marker-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--ink);
+  font-weight: 900;
+  font-size: 10px;
+  line-height: 1;
+}
+.marker-preview-pin {
+  width: 26px;
+  height: 32px;
+  padding-bottom: 7px;
+  border: 2px solid var(--ink);
+  border-radius: 50% 50% 50% 0;
+  background: var(--poi-color);
+  transform: rotate(-45deg);
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.2));
+}
+.marker-preview-pin > span { transform: rotate(45deg); }
+.marker-preview-pin .material-symbols-outlined { font-size: 15px; }
+.marker-preview-dot {
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: var(--poi-color);
+}
+.poi-card-summary { display: grid; flex: 1 1 100px; min-width: 0; gap: 1px; }
+.poi-card-summary strong,
+.poi-card-summary small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.poi-card-summary small { color: var(--muted); font-size: 9px; font-weight: 650; }
+.compact-check {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1;
+  cursor: pointer;
+}
+.compact-check input { width: auto; margin: 0 0 2px; }
+.poi-card-details { display: grid; gap: 8px; }
+.poi-card-details[hidden] { display: none; }
 .icon-button { cursor: pointer; border: 0; background: transparent; color: #8b2c25; font-weight: 900; }
+.toggle-poi { color: var(--ink); padding: 3px; }
 .mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 
 .canvas-area { min-width: 0; display: grid; grid-template-rows: 1fr 30px; background: #d9d6cd; padding: 16px 16px 0; }
@@ -131,11 +182,34 @@ textarea { resize: vertical; min-height: 56px; }
 #map-tint { position: absolute; inset: 0; z-index: 400; pointer-events: none; background: var(--paper); opacity: 0.08; mix-blend-mode: color; }
 .statusbar { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; font-size: 11px; color: #625f58; }
 
-.plain-poi-marker {
-  position: relative;
+.maplibregl-marker.plain-poi-marker {
+  /*
+   * MapLibre positions every marker independently with a translate transform.
+   * This must remain absolute. Using position: relative here puts markers into
+   * the marker pane's document flow, creating order-dependent parallax.
+   */
+  position: absolute;
   width: 40px;
   height: 52px;
+  margin: 0;
+  padding: 0;
   cursor: grab;
+  transform-origin: center bottom;
+  contain: layout style;
+}
+.maplibregl-marker.plain-poi-marker-test {
+  width: 18px;
+  height: 18px;
+  transform-origin: center;
+}
+.poi-native-test-dot {
+  display: block;
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border: 3px solid #111111;
+  border-radius: 50%;
+  background: var(--poi-color, #f97316);
 }
 .poi-pin {
   position: absolute;

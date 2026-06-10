@@ -17,6 +17,7 @@ const DEFAULT_PROJECT = {
   zoom: 15,
   detail_level: "standard",
   poi_marker_mode: "letters",
+  poi_simple_markers: false,
   pois: [],
   route: [],
   route_mode: "straight",
@@ -115,6 +116,7 @@ let parkingLabelMarkers = new Map();
 let routeEditMarkers = [];
 let selectedRouteVertex = null;
 let routeEditMode = false;
+const expandedPoiIds = new Set();
 let drawPurpose = null;
 let activeParkingEditId = null;
 let baseLayerVisibility = new Map();
@@ -446,14 +448,35 @@ function markerContent(poi, index) {
     : `<span>${escapeHtml(value)}</span>`;
 }
 
+function markerPreview(poi, index) {
+  if (project.poi_simple_markers) {
+    return `<span class="marker-preview marker-preview-dot" style="--poi-color:${poi.color}"></span>`;
+  }
+  return `
+    <span class="marker-preview marker-preview-pin ${project.poi_marker_mode === "icons" ? "icon-mode" : ""}"
+      style="--poi-color:${poi.color}">
+      ${markerContent(poi, index)}
+    </span>
+  `;
+}
+
 function markerElement(poi, index) {
   const root = document.createElement("div");
-  root.className = "plain-poi-marker";
+  root.className = project.poi_simple_markers
+    ? "plain-poi-marker plain-poi-marker-test"
+    : "plain-poi-marker";
+  root.dataset.poiId = poi.id;
   /*
-   * MapLibre anchors the root element's bottom center to the geographic point.
-   * This fixed 40x52 SVG ends exactly at y=52, so the pin tip remains locked to
-   * the POI coordinate at every zoom instead of relying on a rotated CSS box.
+   * MapLibre applies its translate transform to this fixed-size, absolutely
+   * positioned root. The pin tip is the root's bottom center, so anchor: bottom
+   * locks the tip to this POI's own longitude/latitude. Do not make this root
+   * relative/static: that overrides MapLibre's marker positioning and causes
+   * later markers to accumulate layout offsets from earlier markers.
    */
+  if (project.poi_simple_markers) {
+    root.innerHTML = `<span class="poi-native-test-dot" style="--poi-color:${poi.color}" aria-hidden="true"></span>`;
+    return root;
+  }
   root.innerHTML = `
     <div class="poi-pin ${project.poi_marker_mode === "icons" ? "icon-mode" : ""}">
       <svg class="poi-pin-svg" viewBox="0 0 40 52" aria-hidden="true">
@@ -494,7 +517,7 @@ function renderPois() {
     const marker = new maplibregl.Marker({
       element: markerElement(poi, index),
       draggable: true,
-      anchor: "bottom",
+      anchor: project.poi_simple_markers ? "center" : "bottom",
       offset: [0, 0],
     })
       .setLngLat([poi.position.lng, poi.position.lat])
@@ -516,45 +539,64 @@ function renderPois() {
 
 function renderPoiList() {
   el("poi-count").textContent = project.pois.length;
-  el("poi-list").innerHTML = project.pois.map((poi, index) => `
-    <article class="editor-card" data-id="${poi.id}">
-      <div class="editor-card-header">
-        <span class="drag-handle" title="Drag to reorder">::</span>
-        <span class="marker-preview ${project.poi_marker_mode === "icons" ? "icon-mode" : ""}" style="background:${poi.color}">${markerContent(poi, index)}</span>
-        <strong>${escapeHtml(poi.label)}</strong>
-        <button class="icon-button delete-poi" title="Delete POI">x</button>
-      </div>
-      <label>Label <input data-field="label" value="${escapeHtml(poi.label)}"></label>
-      <label>Description <textarea data-field="description">${escapeHtml(poi.description)}</textarea></label>
-      <div class="coordinate-grid">
-        <label>Latitude <input data-coordinate="lat" type="number" min="-90" max="90" step="any" value="${poi.position.lat.toFixed(6)}"></label>
-        <label>Longitude <input data-coordinate="lng" type="number" min="-180" max="180" step="any" value="${poi.position.lng.toFixed(6)}"></label>
-      </div>
-      <div class="coordinate-error" aria-live="polite"></div>
-      <label>Suggest nearby POIs
-        <select class="nearby-select" data-nearby="${poi.id}">
-          <option value="">Load nearby suggestions...</option>
-        </select>
-      </label>
-      <div class="mini-grid">
-        <label>Category
-          <select data-field="category">
-            ${categoryOptions.map(([value, label]) => `<option value="${value}" ${poi.category === value ? "selected" : ""}>${label}</option>`).join("")}
-          </select>
-        </label>
-        <label>Icon
-          <select data-field="icon">
-            ${materialIcons.map((icon) => `<option value="${icon}" ${normalizeMaterialIcon(poi.icon) === icon ? "selected" : ""}>${icon}</option>`).join("")}
-          </select>
-        </label>
-      </div>
-      <div class="mini-grid">
-        <label>Color <input data-field="color" type="color" value="${poi.color}"></label>
-        <label class="check-row"><input data-field="selected" type="checkbox" ${poi.selected ? "checked" : ""}> Include in route</label>
-      </div>
-      <label class="check-row"><input data-field="show_label" type="checkbox" ${poi.show_label ? "checked" : ""}> Show label</label>
-    </article>
-  `).join("");
+  el("poi-list").innerHTML = project.pois.map((poi, index) => {
+    const expanded = expandedPoiIds.has(poi.id);
+    const categoryLabel = categoryOptions.find(([value]) => value === poi.category)?.[1] || "Other";
+    return `
+      <article class="editor-card ${expanded ? "expanded" : "collapsed"}" data-id="${poi.id}">
+        <div class="editor-card-header" data-expanded="${expanded}">
+          <span class="drag-handle" title="Drag to reorder">::</span>
+          ${markerPreview(poi, index)}
+          <span class="poi-card-summary">
+            <strong>${escapeHtml(poi.label)}</strong>
+            <small>${escapeHtml(categoryLabel)} · ${poi.position.lat.toFixed(4)}, ${poi.position.lng.toFixed(4)}</small>
+          </span>
+          <label class="compact-check" title="Include in route">
+            <input data-field="selected" type="checkbox" ${poi.selected ? "checked" : ""}>
+            <span>Route</span>
+          </label>
+          <label class="compact-check" title="Show label">
+            <input data-field="show_label" type="checkbox" ${poi.show_label ? "checked" : ""}>
+            <span>Label</span>
+          </label>
+          <button class="icon-button toggle-poi" type="button" title="${expanded ? "Collapse POI" : "Expand POI"}"
+            aria-label="${expanded ? "Collapse POI" : "Expand POI"}" aria-expanded="${expanded}">${expanded ? "▴" : "▾"}</button>
+          <button class="icon-button delete-poi" type="button" title="Delete POI">x</button>
+        </div>
+        <div class="poi-card-details" ${expanded ? "" : "hidden"}>
+          <label>Label <input data-field="label" value="${escapeHtml(poi.label)}"></label>
+          <label>Description <textarea data-field="description">${escapeHtml(poi.description)}</textarea></label>
+          <div class="coordinate-grid">
+            <label>Latitude <input data-coordinate="lat" type="number" min="-90" max="90" step="any" value="${poi.position.lat.toFixed(6)}"></label>
+            <label>Longitude <input data-coordinate="lng" type="number" min="-180" max="180" step="any" value="${poi.position.lng.toFixed(6)}"></label>
+          </div>
+          <div class="coordinate-error" aria-live="polite"></div>
+          <label>Suggest nearby POIs
+            <select class="nearby-select" data-nearby="${poi.id}">
+              <option value="">Load nearby suggestions...</option>
+            </select>
+          </label>
+          <div class="mini-grid">
+            <label>Category
+              <select data-field="category">
+                ${categoryOptions.map(([value, label]) => `<option value="${value}" ${poi.category === value ? "selected" : ""}>${label}</option>`).join("")}
+              </select>
+            </label>
+            <label>Icon
+              <select data-field="icon">
+                ${materialIcons.map((icon) => `<option value="${icon}" ${normalizeMaterialIcon(poi.icon) === icon ? "selected" : ""}>${icon}</option>`).join("")}
+              </select>
+            </label>
+          </div>
+          <div class="mini-grid">
+            <label>Color <input data-field="color" type="color" value="${poi.color}"></label>
+            <label class="check-row"><input data-field="selected" type="checkbox" ${poi.selected ? "checked" : ""}> Include in route</label>
+          </div>
+          <label class="check-row"><input data-field="show_label" type="checkbox" ${poi.show_label ? "checked" : ""}> Show label</label>
+        </div>
+      </article>
+    `;
+  }).join("");
 }
 
 function bindPoiList() {
@@ -605,11 +647,18 @@ function bindPoiList() {
       await fetchNearbySuggestions(select.dataset.nearby);
       return;
     }
-    if (!event.target.matches(".delete-poi")) return;
-    const id = event.target.closest(".editor-card").dataset.id;
-    project.pois = project.pois.filter((item) => item.id !== id);
-    renderPois();
-    if (project.route_mode !== "manual") buildRoute(false);
+    const card = event.target.closest(".editor-card");
+    if (!card) return;
+    if (event.target.closest(".delete-poi")) {
+      expandedPoiIds.delete(card.dataset.id);
+      project.pois = project.pois.filter((item) => item.id !== card.dataset.id);
+      renderPois();
+      if (project.route_mode !== "manual") buildRoute(false);
+      return;
+    }
+    const header = event.target.closest(".editor-card-header");
+    if (!header || event.target.closest("input, label, .drag-handle")) return;
+    togglePoiCard(card.dataset.id);
   });
   new Sortable(el("poi-list"), {
     handle: ".drag-handle",
@@ -621,6 +670,12 @@ function bindPoiList() {
       if (project.route_mode !== "manual") buildRoute(false);
     },
   });
+}
+
+function togglePoiCard(poiId) {
+  if (expandedPoiIds.has(poiId)) expandedPoiIds.delete(poiId);
+  else expandedPoiIds.add(poiId);
+  renderPoiList();
 }
 
 function applyCoordinateInput(input, card, poi, coordinate) {
@@ -1473,6 +1528,7 @@ async function loadProjectFile(file) {
   try {
     const data = JSON.parse(await file.text());
     project = mergeProjectDefaults(data.properties?.plainmapProject || data);
+    expandedPoiIds.clear();
     clearRouteEditHandles();
     syncUiFromProject();
     map.jumpTo({
@@ -1497,6 +1553,7 @@ function mergeProjectDefaults(data) {
     ...data,
     version: 3,
     poi_marker_mode: data.poi_marker_mode || "letters",
+    poi_simple_markers: data.poi_simple_markers === true,
     pois: (data.pois || []).map((poi) => ({
       ...poi,
       icon: normalizeMaterialIcon(poi.icon),
@@ -1612,6 +1669,7 @@ function syncUiFromProject() {
   el("project-name").value = project.name;
   el("detail-level").value = project.detail_level;
   el("poi-marker-mode").value = project.poi_marker_mode;
+  el("poi-simple-markers").checked = project.poi_simple_markers;
   el("route-mode").value = project.route_mode;
   el("show-arrows").checked = project.show_arrows;
   el("zoom-number").value = Number(project.zoom).toFixed(1);
@@ -1669,6 +1727,18 @@ function bindEvents() {
   el("poi-marker-mode").addEventListener("change", (event) => {
     project.poi_marker_mode = event.target.value;
     renderPois();
+  });
+  el("poi-simple-markers").addEventListener("change", (event) => {
+    project.poi_simple_markers = event.target.checked;
+    renderPois();
+  });
+  el("collapse-all-pois").addEventListener("click", () => {
+    expandedPoiIds.clear();
+    renderPoiList();
+  });
+  el("expand-all-pois").addEventListener("click", () => {
+    project.pois.forEach((poi) => expandedPoiIds.add(poi.id));
+    renderPoiList();
   });
   el("show-poi-labels").addEventListener("click", () => {
     project.pois.forEach((poi) => { poi.show_label = true; });

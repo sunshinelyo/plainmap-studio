@@ -91,6 +91,7 @@ class Project(BaseModel):
     zoom: float = Field(default=15, ge=10, le=20)
     detail_level: Literal["minimal", "standard", "detailed"] = "standard"
     poi_marker_mode: Literal["letters", "numbers", "icons"] = "letters"
+    poi_simple_markers: bool = False
     pois: list[POI] = Field(default_factory=list)
     route: list[Coordinate] = Field(default_factory=list)
     route_mode: Literal["straight", "walking", "manual"] = "straight"

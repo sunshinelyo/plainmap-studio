@@ -1,5 +1,6 @@
 import asyncio
 import json
+from pathlib import Path
 
 from pydantic import ValidationError
 
@@ -7,6 +8,30 @@ from backend.export import project_svg
 from backend.file_import import parse_csv, parse_geojson, parse_kml
 from backend.models import Project
 from backend import map_processing
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_poi_markers_keep_maplibre_absolute_positioning():
+    styles = (PROJECT_ROOT / "frontend" / "styles.css").read_text(encoding="utf-8")
+    app = (PROJECT_ROOT / "frontend" / "app.js").read_text(encoding="utf-8")
+    index = (PROJECT_ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
+
+    assert ".maplibregl-marker.plain-poi-marker" in styles
+    marker_rule = styles.split(".maplibregl-marker.plain-poi-marker", 1)[1].split("}", 1)[0]
+    assert "position: absolute" in marker_rule
+    assert ".poi-card-details[hidden] { display: none; }" in styles
+    assert 'anchor: project.poi_simple_markers ? "center" : "bottom"' in app
+    assert "poiMarkers.set(poi.id, marker)" in app
+    assert 'id="poi-simple-markers"' in index
+    assert 'id="collapse-all-pois"' in index
+    assert 'id="expand-all-pois"' in index
+
+
+def test_simple_poi_marker_setting_round_trips():
+    project = Project(poi_simple_markers=True)
+    assert project.model_dump(mode="json")["poi_simple_markers"] is True
 
 
 def test_parse_csv_coordinates():
