@@ -98,6 +98,31 @@ The included `Dockerfile` can be deployed to Render, Railway, Fly.io, DigitalOce
 
 The frontend is plain static HTML/CSS/JavaScript and can also be hosted separately on Vercel, Netlify, or GitHub Pages. In that arrangement, define `window.PLAINMAP_API_BASE_URL` before loading `app.js` and add the frontend origin to `CORS_ORIGINS`.
 
+### PythonAnywhere
+
+The included `pythonanywhere_wsgi.py` adapts the FastAPI application to PythonAnywhere's standard WSGI web hosting:
+
+```bash
+git clone https://github.com/sunshinelyo/plainmap-studio.git
+mkvirtualenv --python=/usr/bin/python3.12 plainmap
+cd ~/plainmap-studio
+pip install -r requirements.txt
+```
+
+Configure the web app source and working directory as `/home/YOURUSERNAME/plainmap-studio`, set its virtualenv to `/home/YOURUSERNAME/.virtualenvs/plainmap`, and use this WSGI configuration:
+
+```python
+import sys
+
+path = "/home/YOURUSERNAME/plainmap-studio"
+if path not in sys.path:
+    sys.path.insert(0, path)
+
+from pythonanywhere_wsgi import application
+```
+
+Free PythonAnywhere accounts restrict outbound API domains. The editor and exports still load, but geocoding, nearby suggestions, and walking routing require allowlisted providers or a paid account.
+
 ## Saved Projects And Future Accounts
 
 Projects are currently downloaded and loaded as local JSON files. Each saved project receives a stable `project_id`, while `owner_id` remains empty. A future account-enabled release can store the same project JSON in Supabase/Postgres and associate `owner_id` with authenticated users without replacing the editor format.
