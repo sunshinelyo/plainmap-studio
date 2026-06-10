@@ -100,7 +100,7 @@ The frontend is plain static HTML/CSS/JavaScript and can also be hosted separate
 
 ### PythonAnywhere
 
-The included `pythonanywhere_wsgi.py` adapts the FastAPI application to PythonAnywhere's standard WSGI web hosting:
+The included `pythonanywhere_wsgi.py` uses a2wsgi's `ASGIMiddleware` to adapt the FastAPI application to PythonAnywhere's standard WSGI web hosting:
 
 ```bash
 git clone https://github.com/sunshinelyo/plainmap-studio.git
