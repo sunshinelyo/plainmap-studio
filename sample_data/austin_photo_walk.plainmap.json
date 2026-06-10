@@ -1,0 +1,74 @@
+{
+  "version": 3,
+  "project_id": "sample-austin-photo-walk",
+  "owner_id": null,
+  "name": "Austin Photo Walk",
+  "center": {"lat": 30.2671, "lng": -97.7451},
+  "zoom": 15,
+  "detail_level": "minimal",
+  "poi_marker_mode": "letters",
+  "pois": [
+    {"id":"poi-a","position":{"lat":30.2747,"lng":-97.7404},"label":"Texas Capitol","description":"Meet on the south lawn","marker":"A","category":"meeting-point","icon":"meeting","color":"#F5D61E","selected":true},
+    {"id":"poi-b","position":{"lat":30.2712,"lng":-97.7421},"label":"Congress Avenue","description":"Historic downtown view","marker":"B","category":"photo-stop","icon":"camera","color":"#F97316","selected":true},
+    {"id":"poi-c","position":{"lat":30.2693,"lng":-97.7428},"label":"Old Bakery","description":"Architectural detail","marker":"C","category":"landmark","icon":"star","color":"#F97316","selected":true},
+    {"id":"poi-d","position":{"lat":30.2670,"lng":-97.7412},"label":"Sixth Street","description":"Neon and street scenes","marker":"D","category":"photo-stop","icon":"camera","color":"#F97316","selected":true},
+    {"id":"poi-e","position":{"lat":30.2673,"lng":-97.7410},"label":"Driskill Hotel","description":"Historic hotel facade","marker":"E","category":"landmark","icon":"star","color":"#F97316","selected":true},
+    {"id":"poi-f","position":{"lat":30.2621,"lng":-97.7446},"label":"Congress Bridge","description":"Skyline viewpoint","marker":"F","category":"photo-stop","icon":"camera","color":"#F97316","selected":true},
+    {"id":"poi-g","position":{"lat":30.2596,"lng":-97.7461},"label":"Butler Trail","description":"Trail entrance","marker":"G","category":"photo-stop","icon":"camera","color":"#F97316","selected":true},
+    {"id":"poi-h","position":{"lat":30.2605,"lng":-97.7514},"label":"Auditorium Shores","description":"Group portrait stop","marker":"H","category":"photo-stop","icon":"camera","color":"#F97316","selected":true},
+    {"id":"poi-i","position":{"lat":30.2648,"lng":-97.7471},"label":"City Hall","description":"Final gathering point","marker":"I","category":"meeting-point","icon":"meeting","color":"#F97316","selected":true}
+  ],
+  "route": [
+    {"lat":30.2747,"lng":-97.7404},
+    {"lat":30.2712,"lng":-97.7421},
+    {"lat":30.2693,"lng":-97.7428},
+    {"lat":30.2670,"lng":-97.7412},
+    {"lat":30.2673,"lng":-97.7410},
+    {"lat":30.2621,"lng":-97.7446},
+    {"lat":30.2596,"lng":-97.7461},
+    {"lat":30.2605,"lng":-97.7514},
+    {"lat":30.2648,"lng":-97.7471}
+  ],
+  "route_mode": "straight",
+  "show_arrows": true,
+  "parking": [
+    {
+      "id":"parking-1",
+      "label":"City Hall Garage",
+      "kind":"recommended",
+      "coordinates":[
+        {"lat":30.2660,"lng":-97.7485},
+        {"lat":30.2660,"lng":-97.7474},
+        {"lat":30.2652,"lng":-97.7472},
+        {"lat":30.2651,"lng":-97.7484}
+      ],
+      "color":"#8E5AD7",
+      "opacity":0.4,
+      "border_color":"#6F3EB8",
+      "show_icon":true
+    },
+    {
+      "id":"parking-2",
+      "label":"Overflow",
+      "kind":"overflow",
+      "coordinates":[
+        {"lat":30.2631,"lng":-97.7504},
+        {"lat":30.2632,"lng":-97.7493},
+        {"lat":30.2624,"lng":-97.7491},
+        {"lat":30.2623,"lng":-97.7502}
+      ],
+      "color":"#8E5AD7",
+      "opacity":0.28,
+      "border_color":"#6F3EB8",
+      "show_icon":true
+    }
+  ],
+  "palette":{"route":"#F5D61E","meeting":"#F5D61E","poi":"#F97316","parking":"#8E5AD7","overflow":"#4DA3FF","background":"#F7F5EF","text":"#111111"},
+  "rotation": 25,
+  "orientation_mode": "route",
+  "compass":{"visible":true,"position":"top-right","size":78,"color":"#111111"},
+  "legend":{"visible":true,"position":{"x":20,"y":20},"width":190,"items":{"meeting":true,"parking":true,"route":true,"photoStops":true,"arrows":true}},
+  "export":{"preset":"portrait","width":1080,"height":1350},
+  "export_boundary":{"enabled":true,"visible":true,"center":{"lat":30.2671,"lng":-97.7451},"width":320,"height":400,"rotation":0,"aspect_ratio":0.8,"lock_aspect":true,"bounds":{"west":-97.752,"south":30.258,"east":-97.738,"north":30.276}},
+  "imported_features":{"type":"FeatureCollection","features":[]}
+}

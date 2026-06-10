@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PlainMap Studio</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,600,0,0">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="https://unpkg.com/@mapbox/mapbox-gl-draw@1.5.0/dist/mapbox-gl-draw.css">
+  <link rel="stylesheet" href="/assets/styles.css?v=10">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <span class="eyebrow">EVENT MAP DESIGNER</span>
+      <h1>PlainMap Studio</h1>
+    </div>
+    <div class="top-actions">
+      <label class="project-name-label">Project
+        <input id="project-name" value="Untitled map">
+      </label>
+      <button id="save-project" class="button secondary">Save project</button>
+      <label class="button secondary file-button">Load project
+        <input id="load-project" type="file" accept=".json,.geojson">
+      </label>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="sidebar" aria-label="Map editing tools">
+      <details open>
+        <summary>Location / Upload</summary>
+        <div class="section-body">
+          <form id="location-form" class="inline-form">
+            <input id="location-input" placeholder="Address or place" required>
+            <button class="button" type="submit">Find</button>
+          </form>
+          <div id="geocode-results" class="search-results"></div>
+          <label class="button secondary full file-button">Upload map data
+            <input id="data-upload" type="file" accept=".kml,.kmz,.gpx,.geojson,.json,.csv">
+          </label>
+          <label>Map detail
+            <select id="detail-level">
+              <option value="minimal">Minimal</option>
+              <option value="standard" selected>Standard</option>
+              <option value="detailed">Detailed</option>
+            </select>
+          </label>
+          <div class="zoom-controls">
+            <button id="zoom-out" class="button secondary" type="button" aria-label="Zoom out">−</button>
+            <label>Zoom
+              <input id="zoom-number" type="number" min="10" max="20" step="0.1" value="15">
+            </label>
+            <button id="zoom-in" class="button secondary" type="button" aria-label="Zoom in">+</button>
+          </div>
+          <label>Zoom level
+            <input id="zoom-slider" type="range" min="10" max="20" step="0.1" value="15">
+          </label>
+        </div>
+      </details>
+
+      <details open>
+        <summary>Points of Interest <span id="poi-count" class="count">0</span></summary>
+        <div class="section-body">
+          <button id="add-poi" class="button full">Add POI at map center</button>
+          <label>Marker mode
+            <select id="poi-marker-mode">
+              <option value="letters">Letters</option>
+              <option value="numbers">Numbers</option>
+              <option value="icons">Icons</option>
+            </select>
+          </label>
+          <div class="button-row">
+            <button id="show-poi-labels" class="button secondary">Show labels</button>
+            <button id="hide-poi-labels" class="button secondary">Hide labels</button>
+          </div>
+          <p class="hint">Drag markers on the map. Drag list handles to reorder and relabel.</p>
+          <div id="poi-list" class="card-list"></div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Route</summary>
+        <div class="section-body">
+          <label>Route method
+            <select id="route-mode">
+              <option value="straight">Straight lines</option>
+              <option value="walking">Walking route</option>
+              <option value="manual">Manual draw</option>
+            </select>
+          </label>
+          <div class="button-row">
+            <button id="build-route" class="button">Build route</button>
+            <button id="edit-route" class="button secondary">Edit mode: off</button>
+          </div>
+          <div class="button-row">
+            <button id="reverse-route" class="button secondary">Reverse</button>
+            <button id="clear-route" class="button danger">Clear</button>
+          </div>
+          <button id="clear-edit-handles" class="button secondary full">Clear edit handles</button>
+          <p class="hint">In edit mode, drag handles, click the route to add one, or right-click/select + Delete to remove one.</p>
+          <label class="check-row"><input id="show-arrows" type="checkbox" checked> Direction arrows</label>
+        </div>
+      </details>
+
+      <details>
+        <summary>Parking</summary>
+        <div class="section-body">
+          <button id="draw-parking" class="button full">Draw parking polygon</button>
+          <p class="hint">Imported polygons can also be clicked and converted to parking.</p>
+          <div id="parking-list" class="card-list"></div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Colors</summary>
+        <div id="palette-controls" class="section-body color-grid"></div>
+        <div class="section-body compact-top">
+          <button id="austin-palette" class="button secondary full">Austin Photo Walkers palette</button>
+        </div>
+      </details>
+
+      <details>
+        <summary>Orientation</summary>
+        <div class="section-body">
+          <div class="segmented">
+            <button data-orientation="north" class="active">North up</button>
+            <button data-orientation="route">Route vertical</button>
+            <button data-orientation="custom">Custom</button>
+          </div>
+          <label>Angle <output id="rotation-output">0°</output>
+            <input id="rotation-slider" type="range" min="-180" max="180" value="0">
+          </label>
+          <button id="fit-route" class="button secondary full">Fit route to canvas</button>
+          <button id="reset-rotation" class="button secondary full">Reset rotation</button>
+        </div>
+      </details>
+
+      <details>
+        <summary>Compass</summary>
+        <div class="section-body">
+          <label class="check-row"><input id="compass-visible" type="checkbox" checked> Show compass</label>
+          <label>Position
+            <select id="compass-position">
+              <option value="top-right">Top right</option>
+              <option value="top-left">Top left</option>
+              <option value="bottom-right">Bottom right</option>
+              <option value="bottom-left">Bottom left</option>
+            </select>
+          </label>
+          <label>Size <input id="compass-size" type="range" min="40" max="160" value="72"></label>
+          <label>Color <input id="compass-color" type="color" value="#111111"></label>
+        </div>
+      </details>
+
+      <details>
+        <summary>Legend</summary>
+        <div class="section-body">
+          <label class="check-row"><input id="legend-visible" type="checkbox" checked> Show legend</label>
+          <div id="legend-toggles"></div>
+          <p class="hint">Drag the legend on the map. Resize it from its lower-right corner.</p>
+        </div>
+      </details>
+
+      <details open>
+        <summary>Export</summary>
+        <div class="section-body">
+          <label>Output size
+            <select id="export-preset">
+              <option value="square">1:1 (1080 x 1080)</option>
+              <option value="portrait" selected>4:5 (1080 x 1350)</option>
+              <option value="story">9:16 (1080 x 1920)</option>
+              <option value="widescreen">16:9 (1920 x 1080)</option>
+              <option value="landscape">4:3 (1600 x 1200)</option>
+              <option value="vertical">3:4 (1200 x 1600)</option>
+              <option value="photo-portrait">2:3 (1200 x 1800)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          <div class="size-row">
+            <label>Width <input id="export-width" type="number" min="320" max="5000" value="1080"></label>
+            <label>Height <input id="export-height" type="number" min="320" max="5000" value="1350"></label>
+          </div>
+          <label class="check-row"><input id="boundary-enabled" type="checkbox" checked> Use export boundary</label>
+          <label class="check-row"><input id="boundary-visible" type="checkbox" checked> Show boundary in editor</label>
+          <label class="check-row"><input id="boundary-lock-aspect" type="checkbox" checked> Lock boundary aspect ratio</label>
+          <div class="button-row">
+            <button id="fit-boundary-route" class="button secondary">Fit to route</button>
+            <button id="center-boundary-route" class="button secondary">Center on route</button>
+          </div>
+          <div class="export-grid">
+            <button data-export="png" class="button">PNG</button>
+            <button data-export="svg" class="button secondary">SVG</button>
+            <button data-export="pdf" class="button secondary">PDF</button>
+            <button data-export="geojson" class="button secondary">GeoJSON</button>
+          </div>
+          <p class="hint">PNG captures the visual basemap. SVG/PDF provide editable vector overlays.</p>
+        </div>
+      </details>
+    </aside>
+
+    <section class="canvas-area">
+      <div id="map-frame" class="map-frame">
+        <div id="map"></div>
+        <div id="map-tint"></div>
+        <div id="compass" class="compass top-right" aria-label="Compass">
+          <div class="compass-arrow">
+            <span class="north">N</span>
+            <svg viewBox="0 0 60 60" aria-hidden="true">
+              <path d="M30 4 L39 31 L30 26 L21 31 Z" fill="currentColor"/>
+              <path d="M30 56 L21 29 L30 34 L39 29 Z" fill="none" stroke="currentColor" stroke-width="2"/>
+              <circle cx="30" cy="30" r="4" fill="currentColor"/>
+            </svg>
+          </div>
+        </div>
+        <div id="legend" class="legend">
+          <strong>Map key</strong>
+          <div id="legend-content"></div>
+        </div>
+        <div id="export-boundary" class="export-boundary" aria-label="Export boundary">
+          <div class="boundary-caption">1080 × 1350 · 4:5</div>
+          <button class="boundary-rotate" type="button" aria-label="Rotate export boundary">↻</button>
+          <span class="boundary-handle nw" data-handle="nw"></span>
+          <span class="boundary-handle ne" data-handle="ne"></span>
+          <span class="boundary-handle sw" data-handle="sw"></span>
+          <span class="boundary-handle se" data-handle="se"></span>
+        </div>
+        <div id="toast" role="status"></div>
+      </div>
+      <div class="statusbar">
+        <span id="map-status">Ready</span>
+        <span>Tip: double-click the map to add a POI</span>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script>
+  <script>window.mapboxgl = window.maplibregl;</script>
+  <script src="https://unpkg.com/@mapbox/mapbox-gl-draw@1.5.0/dist/mapbox-gl-draw.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <script src="/assets/app.js?v=11"></script>
+</body>
+</html>

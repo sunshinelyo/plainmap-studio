@@ -1,0 +1,43 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Downtown Austin photo walk",
+        "stroke": "#F5D61E"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-97.7404, 30.2747],
+          [-97.7421, 30.2712],
+          [-97.7428, 30.2693],
+          [-97.7412, 30.2670],
+          [-97.7410, 30.2673],
+          [-97.7446, 30.2621],
+          [-97.7461, 30.2596],
+          [-97.7514, 30.2605],
+          [-97.7471, 30.2648]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Recommended parking"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-97.7485, 30.2660],
+          [-97.7474, 30.2660],
+          [-97.7472, 30.2652],
+          [-97.7484, 30.2651],
+          [-97.7485, 30.2660]
+        ]]
+      }
+    }
+  ]
+}
+
