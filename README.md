@@ -100,26 +100,26 @@ The frontend is plain static HTML/CSS/JavaScript and can also be hosted separate
 
 ### PythonAnywhere
 
-The included `pythonanywhere_wsgi.py` uses a2wsgi's `ASGIMiddleware` to adapt the FastAPI application to PythonAnywhere's standard WSGI web hosting:
+PythonAnywhere supports FastAPI through its ASGI command-line deployment. Install the PythonAnywhere CLI and create a project virtual environment:
 
 ```bash
 git clone https://github.com/sunshinelyo/plainmap-studio.git
-mkvirtualenv --python=/usr/bin/python3.12 plainmap
 cd ~/plainmap-studio
+python3.12 -m venv plainmap-venv
+source plainmap-venv/bin/activate
 pip install -r requirements.txt
+pip3.12 install --user pythonanywhere
 ```
 
-Configure the web app source and working directory as `/home/YOURUSERNAME/plainmap-studio`, set its virtualenv to `/home/YOURUSERNAME/.virtualenvs/plainmap`, and use this WSGI configuration:
+Create the ASGI website with Uvicorn bound to PythonAnywhere's domain socket. Keep the command in single quotes so your shell does not expand `${DOMAIN_SOCKET}`:
 
-```python
-import sys
-
-path = "/home/YOURUSERNAME/plainmap-studio"
-if path not in sys.path:
-    sys.path.insert(0, path)
-
-from pythonanywhere_wsgi import application
+```bash
+~/.local/bin/pa website create \
+  --domain YOURUSERNAME.pythonanywhere.com \
+  --command '/home/YOURUSERNAME/plainmap-studio/plainmap-venv/bin/uvicorn --app-dir /home/YOURUSERNAME/plainmap-studio --uds ${DOMAIN_SOCKET} backend.main:app'
 ```
+
+Check the configuration with `~/.local/bin/pa website get --domain YOURUSERNAME.pythonanywhere.com`. See PythonAnywhere's [ASGI command-line guide](https://help.pythonanywhere.com/pages/ASGICommandLine/) for update and delete commands.
 
 Free PythonAnywhere accounts restrict outbound API domains. The editor and exports still load, but geocoding, nearby suggestions, and walking routing require allowlisted providers or a paid account.
 
