@@ -1,177 +1,115 @@
-import csv
 import io
-import json
 import zipfile
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
 
-def feature_collection(features: list[dict[str, Any]]) -> dict[str, Any]:
-    return {"type": "FeatureCollection", "features": features}
-
-
 def parse_upload(filename: str, content: bytes) -> dict[str, Any]:
     suffix = Path(filename).suffix.lower()
-    if suffix in {".geojson", ".json"}:
-        return parse_geojson(content)
-    if suffix == ".csv":
-        return parse_csv(content)
-    if suffix == ".gpx":
-        return parse_gpx(content)
     if suffix == ".kml":
         return parse_kml(content)
     if suffix == ".kmz":
         return parse_kmz(content)
-    raise ValueError("Supported formats: GeoJSON, CSV, GPX, KML, and KMZ.")
-
-
-def parse_geojson(content: bytes) -> dict[str, Any]:
-    data = json.loads(content.decode("utf-8-sig"))
-    if data.get("type") == "FeatureCollection":
-        return data
-    if data.get("type") == "Feature":
-        return feature_collection([data])
-    if "type" in data and "coordinates" in data:
-        return feature_collection(
-            [{"type": "Feature", "properties": {}, "geometry": data}]
-        )
-    raise ValueError("The file is not valid GeoJSON.")
-
-
-def parse_csv(content: bytes) -> dict[str, Any]:
-    text = content.decode("utf-8-sig")
-    reader = csv.DictReader(io.StringIO(text))
-    if not reader.fieldnames:
-        raise ValueError("CSV must include a header row.")
-    lookup = {name.lower().strip(): name for name in reader.fieldnames}
-    lat_key = next((lookup[k] for k in ("lat", "latitude", "y") if k in lookup), None)
-    lon_key = next(
-        (lookup[k] for k in ("lon", "lng", "longitude", "x") if k in lookup), None
-    )
-    if not lat_key or not lon_key:
-        raise ValueError("CSV needs lat/latitude and lon/lng/longitude columns.")
-
-    features = []
-    for index, row in enumerate(reader, start=1):
-        try:
-            lat, lon = float(row[lat_key]), float(row[lon_key])
-        except (TypeError, ValueError):
-            continue
-        properties = {
-            key: value
-            for key, value in row.items()
-            if key not in {lat_key, lon_key} and value not in (None, "")
-        }
-        properties.setdefault("label", f"Point {index}")
-        features.append(
-            {
-                "type": "Feature",
-                "properties": properties,
-                "geometry": {"type": "Point", "coordinates": [lon, lat]},
-            }
-        )
-    return feature_collection(features)
-
-
-def _local_name(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1]
-
-
-def parse_gpx(content: bytes) -> dict[str, Any]:
-    root = ET.fromstring(content)
-    features: list[dict[str, Any]] = []
-    for element in root.iter():
-        kind = _local_name(element.tag)
-        if kind == "wpt":
-            name = next(
-                (child.text for child in element if _local_name(child.tag) == "name"),
-                "Waypoint",
-            )
-            features.append(
-                {
-                    "type": "Feature",
-                    "properties": {"label": name},
-                    "geometry": {
-                        "type": "Point",
-                        "coordinates": [
-                            float(element.attrib["lon"]),
-                            float(element.attrib["lat"]),
-                        ],
-                    },
-                }
-            )
-        if kind in {"trkseg", "rte"}:
-            point_names = {"trkseg": "trkpt", "rte": "rtept"}
-            coordinates = [
-                [float(point.attrib["lon"]), float(point.attrib["lat"])]
-                for point in element
-                if _local_name(point.tag) == point_names[kind]
-            ]
-            if coordinates:
-                features.append(
-                    {
-                        "type": "Feature",
-                        "properties": {"label": "Imported route"},
-                        "geometry": {"type": "LineString", "coordinates": coordinates},
-                    }
-                )
-    return feature_collection(features)
-
-
-def _kml_coordinates(text: str | None) -> list[list[float]]:
-    coordinates = []
-    for token in (text or "").replace("\n", " ").split():
-        parts = token.split(",")
-        if len(parts) >= 2:
-            coordinates.append([float(parts[0]), float(parts[1])])
-    return coordinates
-
-
-def parse_kml(content: bytes) -> dict[str, Any]:
-    root = ET.fromstring(content)
-    features: list[dict[str, Any]] = []
-    for placemark in (el for el in root.iter() if _local_name(el.tag) == "Placemark"):
-        name = next(
-            (child.text for child in placemark.iter() if _local_name(child.tag) == "name"),
-            "Imported feature",
-        )
-        for geometry in placemark.iter():
-            kind = _local_name(geometry.tag)
-            if kind not in {"Point", "LineString", "Polygon"}:
-                continue
-            coord_node = next(
-                (
-                    child
-                    for child in geometry.iter()
-                    if _local_name(child.tag) == "coordinates"
-                ),
-                None,
-            )
-            coordinates = _kml_coordinates(coord_node.text if coord_node is not None else "")
-            if not coordinates:
-                continue
-            if kind == "Point":
-                geo = {"type": "Point", "coordinates": coordinates[0]}
-            elif kind == "LineString":
-                geo = {"type": "LineString", "coordinates": coordinates}
-            else:
-                geo = {"type": "Polygon", "coordinates": [coordinates]}
-            features.append(
-                {
-                    "type": "Feature",
-                    "properties": {"label": name},
-                    "geometry": geo,
-                }
-            )
-            break
-    return feature_collection(features)
+    raise ValueError("Upload a KML or KMZ file.")
 
 
 def parse_kmz(content: bytes) -> dict[str, Any]:
-    with zipfile.ZipFile(io.BytesIO(content)) as archive:
-        names = [name for name in archive.namelist() if name.lower().endswith(".kml")]
-        if not names:
-            raise ValueError("KMZ archive does not contain a KML file.")
-        return parse_kml(archive.read(names[0]))
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            kml_files = [
+                name for name in archive.namelist()
+                if name.lower().endswith(".kml") and not name.endswith("/")
+            ]
+            if not kml_files:
+                raise ValueError("This KMZ does not contain a KML file.")
+            preferred = next(
+                (name for name in kml_files if Path(name).name.lower() == "doc.kml"),
+                kml_files[0],
+            )
+            return parse_kml(archive.read(preferred))
+    except zipfile.BadZipFile as exc:
+        raise ValueError("This KMZ file is not a valid archive.") from exc
 
+
+def parse_kml(content: bytes) -> dict[str, Any]:
+    try:
+        root = ET.fromstring(content)
+    except ET.ParseError as exc:
+        raise ValueError("This KML file is not valid XML.") from exc
+
+    features: list[dict[str, Any]] = []
+    for placemark in elements_named(root, "Placemark"):
+        label = element_text(placemark, "name") or "Untitled place"
+        for point in elements_named(placemark, "Point"):
+            coordinates = geometry_coordinates(point)
+            if coordinates:
+                features.append(feature("Point", coordinates[0], label))
+
+        for line in elements_named(placemark, "LineString"):
+            coordinates = geometry_coordinates(line)
+            if len(coordinates) >= 2:
+                features.append(feature("LineString", coordinates, label))
+
+        for track in elements_named(placemark, "Track"):
+            coordinates = track_coordinates(track)
+            if len(coordinates) >= 2:
+                features.append(feature("LineString", coordinates, label))
+
+    if not features:
+        raise ValueError(
+            "No point placemarks or walking paths were found in this file."
+        )
+    return {"type": "FeatureCollection", "features": features}
+
+
+def local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def elements_named(root: ET.Element, name: str):
+    return (element for element in root.iter() if local_name(element.tag) == name)
+
+
+def first_descendant(root: ET.Element, name: str) -> ET.Element | None:
+    return next(elements_named(root, name), None)
+
+
+def element_text(root: ET.Element, name: str) -> str:
+    element = first_descendant(root, name)
+    return (element.text or "").strip() if element is not None else ""
+
+
+def geometry_coordinates(geometry: ET.Element) -> list[list[float]]:
+    text = element_text(geometry, "coordinates")
+    coordinates: list[list[float]] = []
+    for token in text.replace("\n", " ").replace("\t", " ").split():
+        parts = token.split(",")
+        if len(parts) < 2:
+            continue
+        try:
+            coordinates.append([float(parts[0]), float(parts[1])])
+        except ValueError:
+            continue
+    return coordinates
+
+
+def track_coordinates(track: ET.Element) -> list[list[float]]:
+    coordinates: list[list[float]] = []
+    for node in elements_named(track, "coord"):
+        parts = (node.text or "").split()
+        if len(parts) < 2:
+            continue
+        try:
+            coordinates.append([float(parts[0]), float(parts[1])])
+        except ValueError:
+            continue
+    return coordinates
+
+
+def feature(kind: str, coordinates: Any, label: str) -> dict[str, Any]:
+    return {
+        "type": "Feature",
+        "properties": {"label": label},
+        "geometry": {"type": kind, "coordinates": coordinates},
+    }

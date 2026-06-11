@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>PlainMap sample walk</name>
+    <Placemark>
+      <name>Starting point</name>
+      <Point>
+        <coordinates>-97.7431,30.2672,0</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark>
+      <name>Photo stop</name>
+      <Point>
+        <coordinates>-97.7398,30.2693,0</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark>
+      <name>Walking path</name>
+      <LineString>
+        <coordinates>
+          -97.7431,30.2672,0
+          -97.7414,30.2681,0
+          -97.7398,30.2693,0
+        </coordinates>
+      </LineString>
+    </Placemark>
+  </Document>
+</kml>

@@ -1,2251 +1,928 @@
-const AUSTIN_PALETTE = {
-  route: "#F5D61E",
-  meeting: "#F5D61E",
-  poi: "#F97316",
-  parking: "#8E5AD7",
-  overflow: "#4DA3FF",
-  background: "#F7F5EF",
-  text: "#111111",
-};
-
-const DEFAULT_PROJECT = {
-  version: 4,
-  project_id: null,
-  owner_id: null,
-  name: "Untitled map",
-  center: { lat: 30.2672, lng: -97.7431 },
-  zoom: 15,
-  detail_level: "standard",
-  poi_marker_mode: "letters",
-  poi_simple_markers: false,
-  workflow_stage: 0,
-  quick_edit_mode: false,
+const state = {
   pois: [],
   route: [],
-  route_mode: "straight",
-  show_arrows: true,
-  parking: [],
-  palette: { ...AUSTIN_PALETTE },
-  rotation: 0,
-  orientation_mode: "north",
-  compass: { visible: true, position: "top-right", size: 72, color: "#111111", locked: false, snap: true, custom_position: {} },
-  legend: {
-    visible: true,
-    position: { x: 20, y: 20 },
-    width: 190,
-    height: 0,
-    locked: false,
-    snap: true,
-    items: { meeting: true, parking: true, route: true, photoStops: true, arrows: true },
+  mode: "view",
+  dragIndex: null,
+  draggedPoi: null,
+  selectedPoi: null,
+  hidePoiLabels: false,
+  routeMarkers: [],
+  colors: {
+    route: "#f05a3c",
+    poi: "#14213d",
+    frame: "#f4c542",
   },
-  export: { preset: "portrait", width: 1080, height: 1350 },
-  export_boundary: {
-    enabled: true,
-    visible: true,
-    center: { lat: 30.2672, lng: -97.7431 },
-    width: 320,
-    height: 400,
-    rotation: 0,
-    aspect_ratio: 0.8,
-    lock_aspect: true,
-    bounds: {},
-  },
-  imported_features: { type: "FeatureCollection", features: [] },
-  imported_layers: [],
 };
 
-const paletteLabels = {
-  route: "Route",
-  meeting: "Meeting point",
-  poi: "POI marker",
-  parking: "Parking",
-  overflow: "Overflow",
-  background: "Background tint",
-  text: "Text",
+const FRAME_INSET = { top: 50, right: 150, bottom: 50, left: 42 };
+
+const elements = {
+  fileInput: document.querySelector("#file-input"),
+  importStatus: document.querySelector("#import-status"),
+  poiCount: document.querySelector("#poi-count"),
+  routeCount: document.querySelector("#route-count"),
+  addPoi: document.querySelector("#add-poi"),
+  hidePoiLabels: document.querySelector("#hide-poi-labels"),
+  poiList: document.querySelector("#poi-list"),
+  drawRoute: document.querySelector("#draw-route"),
+  editRoute: document.querySelector("#edit-route"),
+  clearRoute: document.querySelector("#clear-route"),
+  routeColor: document.querySelector("#route-color"),
+  poiColor: document.querySelector("#poi-color"),
+  frameShape: document.querySelector("#frame-shape"),
+  cropFrame: document.querySelector("#crop-frame"),
+  fitContent: document.querySelector("#fit-content"),
+  exportPng: document.querySelector("#export-png"),
+  message: document.querySelector("#app-message"),
+  dropZone: document.querySelector("#drop-zone"),
+  mapTip: document.querySelector("#map-tip"),
+  routeOverlayLine: document.querySelector("#route-overlay-line"),
+  routeOverlayOutline: document.querySelector("#route-overlay-outline"),
+  poiOverlay: document.querySelector("#poi-overlay"),
 };
 
-const categoryOptions = [
-  ["photo-stop", "Photo stop"],
-  ["meeting-point", "Meeting point"],
-  ["restroom", "Restroom"],
-  ["landmark", "Landmark"],
-  ["parking", "Parking"],
-  ["train", "Train"],
-  ["food", "Food"],
-  ["other", "Other"],
-];
-const categoryDefaults = {
-  "photo-stop": { color: "#F97316", icon: "photo_camera" },
-  "meeting-point": { color: "#F5D61E", icon: "groups" },
-  parking: { color: "#8E5AD7", icon: "local_parking" },
-  train: { color: "#4DA3FF", icon: "train" },
-  food: { color: "#E24A3B", icon: "restaurant" },
-  restroom: { color: "#2AA198", icon: "wc" },
-  landmark: { color: "#6B8E23", icon: "landscape" },
-  other: { color: "#F97316", icon: "location_on" },
-};
-const workflowStages = [
-  "Import / Create Map", "Configure Base Map", "Add Points of Interest", "Build / Edit Route",
-  "Configure Parking", "Customize Appearance", "Configure Export", "Review & Export",
-];
-
-const materialIcons = [
-  "photo_camera",
-  "location_on",
-  "local_parking",
-  "directions_walk",
-  "restaurant",
-  "wc",
-  "water_drop",
-  "park",
-  "train",
-  "bridge",
-  "landscape",
-  "groups",
-  "event",
-  "schedule",
-];
-const legacyIconNames = {
-  camera: "photo_camera",
-  pin: "location_on",
-  star: "landscape",
-  food: "restaurant",
-  restroom: "wc",
-  meeting: "groups",
-};
-const exportPresets = {
-  square: { width: 1080, height: 1080, label: "1:1" },
-  portrait: { width: 1080, height: 1350, label: "4:5" },
-  story: { width: 1080, height: 1920, label: "9:16" },
-  widescreen: { width: 1920, height: 1080, label: "16:9" },
-  landscape: { width: 1600, height: 1200, label: "4:3" },
-  vertical: { width: 1200, height: 1600, label: "3:4" },
-  "photo-portrait": { width: 1200, height: 1800, label: "2:3" },
-};
-const legacyExportPresets = {
-  "instagram-square": "square",
-  "instagram-portrait": "portrait",
-  "instagram-story": "story",
-};
-const API_BASE_URL = String(window.PLAINMAP_API_BASE_URL || "").replace(/\/$/, "");
-const apiUrl = (path) => `${API_BASE_URL}${path}`;
-
-let project = structuredClone(DEFAULT_PROJECT);
-let map;
-let draw;
-let poiMarkers = new Map();
-let parkingLabelMarkers = new Map();
-let routeEditMarkers = [];
-let selectedRouteVertex = null;
-let routeEditMode = false;
-const expandedPoiIds = new Set();
-let drawPurpose = null;
-let activeParkingEditId = null;
-let baseLayerVisibility = new Map();
-let styleReady = false;
-let toastTimer;
-let boundaryInteraction = null;
-let pendingImportFile = null;
-let routeUndoStack = [];
-let routeRedoStack = [];
-let lastSavedRoute = [];
-
-const el = (id) => document.getElementById(id);
-const uuid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
-const letters = (index) => {
-  let label = "";
-  for (let value = index + 1; value > 0; value = Math.floor((value - 1) / 26)) {
-    label = String.fromCharCode(65 + ((value - 1) % 26)) + label;
-  }
-  return label;
-};
-const escapeHtml = (value = "") => String(value).replace(/[&<>"']/g, (char) => ({
-  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;",
-}[char]));
-const normalizeMaterialIcon = (name) => {
-  const normalized = legacyIconNames[name] || name;
-  return materialIcons.includes(normalized) ? normalized : "photo_camera";
-};
-const pointFeature = (coordinates, properties = {}) => ({
-  type: "Feature",
-  properties,
-  geometry: { type: "Point", coordinates },
+const map = new maplibregl.Map({
+  container: "map",
+  style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+  center: [-97.7431, 30.2672],
+  zoom: 13,
+  preserveDrawingBuffer: true,
+  attributionControl: false,
 });
 
-function renderWorkflow() {
-  el("current-stage-label").textContent = `${project.workflow_stage + 1}. ${workflowStages[project.workflow_stage]}`;
-  el("workflow-steps").innerHTML = workflowStages.map((label, index) => `
-    <button type="button" data-workflow-stage="${index}"
-      class="${index === project.workflow_stage ? "active" : ""} ${index < project.workflow_stage ? "complete" : ""}"
-      ${index > project.workflow_stage && !project.quick_edit_mode ? "disabled" : ""}
-      title="${escapeHtml(label)}">${index + 1}</button>
-  `).join("");
-  el("quick-edit-mode").checked = project.quick_edit_mode;
-  document.body.classList.toggle("quick-edit", project.quick_edit_mode);
-  document.querySelectorAll(".sidebar details[data-stage]").forEach((section) => {
-    const stages = section.dataset.stage.split(",").map(Number);
-    section.hidden = !project.quick_edit_mode && !stages.includes(project.workflow_stage);
-    if (!section.hidden && !project.quick_edit_mode) section.open = true;
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
+map.doubleClickZoom.disable();
+
+map.on("load", () => {
+  [
+    "waterway_label",
+    "place_hamlet",
+    "place_suburbs",
+    "place_villages",
+    "poi_stadium",
+    "poi_park",
+    "roadname_minor",
+    "housenumber",
+  ].forEach((layerId) => {
+    if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", "none");
   });
-  el("previous-stage").disabled = project.workflow_stage === 0;
-  el("next-stage").disabled = project.workflow_stage === workflowStages.length - 1;
-  el("next-stage").textContent = project.workflow_stage === workflowStages.length - 2 ? "Review map" : "Next step";
-  const review = el("review-summary");
-  review.hidden = project.workflow_stage !== 7 || project.quick_edit_mode;
-  review.innerHTML = `
-    <strong>Ready to export</strong>
-    <span>${project.pois.length} POIs · ${project.route.length} route vertices · ${project.parking.length} parking areas</span>
-    ${project.route.length < 2 ? "<span class=\"review-warning\">No complete route yet.</span>" : ""}
-  `;
-}
+  map.addSource("route", emptyCollection());
+  map.addSource("route-vertices", emptyCollection());
+  map.addSource("pois", emptyCollection());
 
-function setWorkflowStage(stage) {
-  project.workflow_stage = Math.max(0, Math.min(workflowStages.length - 1, Number(stage)));
-  renderWorkflow();
-}
-const featureCollection = (features = []) => ({ type: "FeatureCollection", features });
-
-function showToast(message) {
-  el("toast").textContent = message;
-  el("toast").classList.add("visible");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el("toast").classList.remove("visible"), 2800);
-}
-
-function setStatus(message) {
-  el("map-status").textContent = message;
-}
-
-function initMap() {
-  map = new maplibregl.Map({
-    container: "map",
-    style: "https://tiles.openfreemap.org/styles/liberty",
-    center: [project.center.lng, project.center.lat],
-    zoom: project.zoom,
-    minZoom: 10,
-    maxZoom: 20,
-    bearing: project.rotation,
-    attributionControl: true,
-    preserveDrawingBuffer: true,
-  });
-  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
-  draw = new MapboxDraw({
-    displayControlsDefault: false,
-    styles: drawStyles(),
-  });
-  map.addControl(draw);
-
-  map.on("load", () => {
-    styleReady = true;
-    rememberBaseLayerVisibility();
-    addProjectSourcesAndLayers();
-    applyDetailLevel(project.detail_level);
-    renderAll();
-    map.once("idle", () => renderExportBoundary(false));
-  });
-  map.on("styledata", () => {
-    if (styleReady && !map.getSource("plainmap-route")) {
-      rememberBaseLayerVisibility();
-      addProjectSourcesAndLayers();
-      renderAll();
-    }
-  });
-  map.on("moveend", () => {
-    syncCameraState();
-    syncZoomControls();
-    updateBoundaryGeography();
-  });
-  map.on("zoom", syncZoomControls);
-  map.on("resize", () => renderExportBoundary(false));
-  map.on("rotate", () => {
-    project.rotation = normalizeBearing(map.getBearing());
-    el("rotation-slider").value = project.rotation;
-    el("rotation-output").value = `${Math.round(project.rotation)}°`;
-    renderCompass();
-  });
-  map.on("dblclick", (event) => {
-    event.preventDefault();
-    addPoi({ lat: event.lngLat.lat, lng: event.lngLat.lng });
-  });
-  map.on("draw.create", handleDrawCreate);
-  map.on("draw.update", handleDrawUpdate);
-  map.on("draw.delete", handleDrawDelete);
-  map.on("click", "plainmap-route-line", handleRouteLineClick);
-  map.on("mouseenter", "plainmap-route-line", () => {
-    if (routeEditMode) map.getCanvas().style.cursor = "crosshair";
-  });
-  map.on("mouseleave", "plainmap-route-line", () => {
-    map.getCanvas().style.cursor = "";
-  });
-  map.on("click", "plainmap-imported-fill", handleImportedPolygonClick);
-}
-
-function drawStyles() {
-  return [
-    {
-      id: "gl-draw-polygon-fill",
-      type: "fill",
-      filter: ["all", ["==", "$type", "Polygon"]],
-      paint: { "fill-color": project.palette.parking, "fill-opacity": 0.28 },
-    },
-    {
-      id: "gl-draw-lines",
-      type: "line",
-      filter: ["any", ["==", "$type", "LineString"], ["==", "$type", "Polygon"]],
-      layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": project.palette.route, "line-width": 5 },
-    },
-    {
-      id: "gl-draw-points",
-      type: "circle",
-      filter: ["==", "$type", "Point"],
-      paint: {
-        "circle-radius": 6,
-        "circle-color": "#ffffff",
-        "circle-stroke-color": "#111111",
-        "circle-stroke-width": 2,
-      },
-    },
-  ];
-}
-
-function rememberBaseLayerVisibility() {
-  baseLayerVisibility.clear();
-  for (const layer of map.getStyle().layers || []) {
-    if (layer.id.startsWith("plainmap-") || layer.id.startsWith("gl-draw-")) continue;
-    baseLayerVisibility.set(layer.id, layer.layout?.visibility || "visible");
-  }
-}
-
-function layerDescriptor(layer) {
-  return `${layer.id} ${layer["source-layer"] || ""}`.toLowerCase();
-}
-
-function applyDetailLevel(level) {
-  if (!styleReady) return;
-  project.detail_level = level;
-
-  /*
-   * OpenFreeMap is vector-based, so detail modes change real style-layer
-   * visibility instead of fading a finished raster image. Layer names differ
-   * between styles; these semantic groups intentionally match both layer ids
-   * and source-layer names. Detailed restores the style's original visibility.
-   */
-  const usefulLabels = /(water|park|natural|place|city|town|village|state|country|road|street|motorway|trunk|primary|path|trail)/;
-  const majorMinimalLabels = /(water|park|place|city|town|state|country|motorway|trunk|primary|path|trail)/;
-  const clutter = /(poi|amenity|shop|restaurant|cafe|bar|business|commercial|transit|station|bus|rail|airport|housenumber|address)/;
-
-  for (const layer of map.getStyle().layers || []) {
-    if (!baseLayerVisibility.has(layer.id)) continue;
-    let visibility = baseLayerVisibility.get(layer.id);
-    if (layer.type === "symbol" && level !== "detailed") {
-      const descriptor = layerDescriptor(layer);
-      if (level === "standard") {
-        visibility = clutter.test(descriptor) && !usefulLabels.test(descriptor) ? "none" : visibility;
-      } else {
-        visibility = majorMinimalLabels.test(descriptor) && !clutter.test(descriptor) ? visibility : "none";
-      }
-    }
-    map.setLayoutProperty(layer.id, "visibility", visibility);
-  }
-  const mapFrame = el("map-frame");
-  mapFrame.className = `map-frame detail-${level}`;
-  mapFrame.dataset.hiddenBaseLayers = String(
-    [...baseLayerVisibility.keys()].filter((id) => map.getLayoutProperty(id, "visibility") === "none").length
-  );
-}
-
-function addProjectSourcesAndLayers() {
-  map.addSource("plainmap-route", { type: "geojson", data: routeGeoJSON() });
   map.addLayer({
-    id: "plainmap-route-line",
+    id: "route-outline",
     type: "line",
-    source: "plainmap-route",
+    source: "route",
     layout: { "line-cap": "round", "line-join": "round" },
-    paint: {
-      "line-color": project.palette.route,
-      "line-width": 8,
-      "line-opacity": 0.95,
-    },
+    paint: { "line-color": "#ffffff", "line-width": 13 },
   });
   map.addLayer({
-    id: "plainmap-route-arrows",
-    type: "symbol",
-    source: "plainmap-route",
-    layout: {
-      "symbol-placement": "line",
-      "symbol-spacing": 80,
-      "text-field": "▶",
-      "text-size": 15,
-      "text-keep-upright": false,
-      visibility: project.show_arrows ? "visible" : "none",
-    },
-    paint: {
-      "text-color": project.palette.text,
-      "text-halo-color": "#ffffff",
-      "text-halo-width": 1,
-    },
-  });
-
-  map.addSource("plainmap-parking", { type: "geojson", data: parkingGeoJSON() });
-  map.addLayer({
-    id: "plainmap-parking-fill",
-    type: "fill",
-    source: "plainmap-parking",
-    paint: {
-      "fill-color": ["get", "color"],
-      "fill-opacity": ["get", "opacity"],
-    },
-  });
-  map.addLayer({
-    id: "plainmap-parking-line",
+    id: "route-line",
     type: "line",
-    source: "plainmap-parking",
-    paint: { "line-color": ["get", "borderColor"], "line-width": 3 },
-  });
-
-  map.addSource("plainmap-imported", { type: "geojson", data: importedLayerGeoJSON() });
-  map.addLayer({
-    id: "plainmap-imported-fill",
-    type: "fill",
-    source: "plainmap-imported",
-    filter: ["==", ["geometry-type"], "Polygon"],
-    paint: { "fill-color": "#a8c99b", "fill-opacity": 0.25 },
+    source: "route",
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": state.colors.route, "line-width": 8 },
   });
   map.addLayer({
-    id: "plainmap-imported-line",
-    type: "line",
-    source: "plainmap-imported",
-    filter: ["in", ["geometry-type"], ["literal", ["LineString", "Polygon"]]],
-    paint: { "line-color": project.palette.route, "line-width": 4, "line-opacity": 0.75 },
-  });
-  map.addLayer({
-    id: "plainmap-imported-points",
+    id: "route-vertices",
     type: "circle",
-    source: "plainmap-imported",
-    filter: ["==", ["geometry-type"], "Point"],
+    source: "route-vertices",
     paint: {
-      "circle-radius": 6,
-      "circle-color": project.palette.poi,
-      "circle-stroke-color": project.palette.text,
-      "circle-stroke-width": 2,
+      "circle-radius": 7,
+      "circle-color": "#ffffff",
+      "circle-stroke-color": state.colors.route,
+      "circle-stroke-width": 3,
     },
   });
-}
+  renderAll();
+});
 
-function syncCameraState() {
-  const center = map.getCenter();
-  project.center = { lat: center.lat, lng: center.lng };
-  project.zoom = map.getZoom();
-  project.rotation = normalizeBearing(map.getBearing());
-}
-
-function syncZoomControls() {
-  if (!map) return;
-  const zoom = Math.max(10, Math.min(20, map.getZoom()));
-  project.zoom = zoom;
-  el("zoom-number").value = zoom.toFixed(1);
-  el("zoom-slider").value = zoom;
-}
-
-function setMapZoom(value) {
-  const zoom = Math.max(10, Math.min(20, Number(value)));
-  if (!Number.isFinite(zoom)) return;
-  map.easeTo({ zoom, duration: 180 });
-  el("zoom-number").value = zoom.toFixed(1);
-  el("zoom-slider").value = zoom;
-}
-
-function normalizeBearing(value) {
-  let bearing = Number(value);
-  while (bearing > 180) bearing -= 360;
-  while (bearing < -180) bearing += 360;
-  return bearing;
-}
-
-function routeGeoJSON() {
-  return featureCollection(project.route.length > 1 ? [{
-    type: "Feature",
-    properties: {},
-    geometry: {
-      type: "LineString",
-      coordinates: project.route.map((point) => [point.lng, point.lat]),
-    },
-  }] : []);
-}
-
-function parkingGeoJSON() {
-  return featureCollection(project.parking.map((area) => {
-    const ring = area.coordinates.map((point) => [point.lng, point.lat]);
-    if (ring.length && (ring[0][0] !== ring.at(-1)[0] || ring[0][1] !== ring.at(-1)[1])) {
-      ring.push([...ring[0]]);
-    }
-    return {
-      type: "Feature",
-      properties: {
-        id: area.id,
-        color: area.color,
-        opacity: area.opacity,
-        borderColor: area.border_color,
-      },
-      geometry: { type: "Polygon", coordinates: [ring] },
-    };
-  }));
-}
-
-function markerText(poi, index) {
-  const mode = poi.display_mode || "auto";
-  if (mode === "text") return String(poi.short_text || poi.label || "POI").slice(0, 10);
-  if (mode === "icon") return normalizeMaterialIcon(poi.icon);
-  if (mode === "reference") return project.poi_marker_mode === "numbers" ? String(index + 1) : letters(index);
-  if (project.poi_marker_mode === "numbers") return String(index + 1);
-  if (project.poi_marker_mode === "icons") return normalizeMaterialIcon(poi.icon);
-  return letters(index);
-}
-
-function markerContent(poi, index) {
-  const value = markerText(poi, index);
-  const iconMode = poi.display_mode === "icon" || (poi.display_mode === "auto" && project.poi_marker_mode === "icons");
-  return iconMode
-    ? `<span class="material-symbols-outlined">${escapeHtml(value)}</span>`
-    : `<span class="${poi.display_mode === "text" ? "short-text" : ""}">${escapeHtml(value)}</span>`;
-}
-
-function markerPreview(poi, index) {
-  if (project.poi_simple_markers) {
-    return `<span class="marker-preview marker-preview-dot" style="--poi-color:${poi.color}"></span>`;
-  }
-  return `
-    <span class="marker-preview marker-preview-pin ${(poi.display_mode === "icon" || (poi.display_mode === "auto" && project.poi_marker_mode === "icons")) ? "icon-mode" : ""}"
-      style="--poi-color:${poi.color}">
-      ${markerContent(poi, index)}
-    </span>
-  `;
-}
-
-function markerElement(poi, index) {
-  const root = document.createElement("div");
-  root.className = project.poi_simple_markers
-    ? "plain-poi-marker plain-poi-marker-test"
-    : "plain-poi-marker";
-  root.dataset.poiId = poi.id;
-  /*
-   * MapLibre applies its translate transform to this fixed-size, absolutely
-   * positioned root. The pin tip is the root's bottom center, so anchor: bottom
-   * locks the tip to this POI's own longitude/latitude. Do not make this root
-   * relative/static: that overrides MapLibre's marker positioning and causes
-   * later markers to accumulate layout offsets from earlier markers.
-   */
-  if (project.poi_simple_markers) {
-    root.innerHTML = `<span class="poi-native-test-dot" style="--poi-color:${poi.color}" aria-hidden="true"></span>`;
-    return root;
-  }
-  root.innerHTML = `
-    <div class="poi-pin ${(poi.display_mode === "icon" || (poi.display_mode === "auto" && project.poi_marker_mode === "icons")) ? "icon-mode" : ""}">
-      <svg class="poi-pin-svg" viewBox="0 0 40 52" aria-hidden="true">
-        <path d="M20 1.5C9.5 1.5 2 9.2 2 19.5C2 33 20 52 20 52S38 33 38 19.5C38 9.2 30.5 1.5 20 1.5Z"
-          fill="${poi.color}" stroke="#111111" stroke-width="3"/>
-      </svg>
-      ${markerContent(poi, index)}
-    </div>
-    ${poi.show_label ? `<b class="poi-label">${escapeHtml(poi.label)}</b>` : ""}
-  `;
-  return root;
-}
-
-function addPoi(latlng, overrides = {}) {
-  const index = project.pois.length;
-  project.pois.push({
-    id: uuid(),
-    position: { lat: Number(latlng.lat), lng: Number(latlng.lng) },
-    label: overrides.label || `Stop ${letters(index)}`,
-    description: overrides.description || "",
-    marker: letters(index),
-    category: overrides.category || "photo-stop",
-    icon: normalizeMaterialIcon(overrides.icon || "photo_camera"),
-    color: overrides.color || project.palette.poi,
-    display_mode: overrides.display_mode || "auto",
-    short_text: overrides.short_text || "",
-    use_category_defaults: overrides.use_category_defaults !== false,
-    selected: true,
-    show_label: true,
-  });
-  renderPois();
-  renderLegend();
-}
-
-function renderPois() {
-  if (!map) return;
-  poiMarkers.forEach((marker) => marker.remove());
-  poiMarkers.clear();
-  project.pois.forEach((poi, index) => {
-    poi.marker = project.poi_marker_mode === "numbers" ? String(index + 1) : letters(index);
-    const marker = new maplibregl.Marker({
-      element: markerElement(poi, index),
-      draggable: true,
-      anchor: project.poi_simple_markers ? "center" : "bottom",
-      offset: [0, 0],
-    })
-      .setLngLat([poi.position.lng, poi.position.lat])
-      .setPopup(new maplibregl.Popup({ offset: 28 }).setHTML(
-        `<strong>${escapeHtml(poi.label)}</strong><br>${escapeHtml(poi.description)}`
-      ))
-      .addTo(map);
-    marker.on("dragend", () => {
-      const position = marker.getLngLat();
-      poi.position = { lat: position.lat, lng: position.lng };
-      renderPoiList();
-      if (project.route_mode !== "manual") buildRoute(false);
-      fetchNearbySuggestions(poi.id);
-    });
-    poiMarkers.set(poi.id, marker);
-  });
-  renderPoiList();
-}
-
-function renderPoiList() {
-  el("poi-count").textContent = project.pois.length;
-  el("poi-list").innerHTML = project.pois.map((poi, index) => {
-    const expanded = expandedPoiIds.has(poi.id);
-    const categoryLabel = categoryOptions.find(([value]) => value === poi.category)?.[1] || "Other";
-    return `
-      <article class="editor-card ${expanded ? "expanded" : "collapsed"}" data-id="${poi.id}">
-        <div class="editor-card-header" data-expanded="${expanded}">
-          <span class="drag-handle" title="Drag to reorder">::</span>
-          ${markerPreview(poi, index)}
-          <span class="poi-card-summary">
-            <strong>${escapeHtml(poi.label)}</strong>
-            <small>${escapeHtml(categoryLabel)} · ${poi.position.lat.toFixed(4)}, ${poi.position.lng.toFixed(4)}</small>
-          </span>
-          <label class="compact-check" title="Include in route">
-            <input data-field="selected" type="checkbox" ${poi.selected ? "checked" : ""}>
-            <span>Route</span>
-          </label>
-          <label class="compact-check" title="Show label">
-            <input data-field="show_label" type="checkbox" ${poi.show_label ? "checked" : ""}>
-            <span>Label</span>
-          </label>
-          <button class="icon-button toggle-poi" type="button" title="${expanded ? "Collapse POI" : "Expand POI"}"
-            aria-label="${expanded ? "Collapse POI" : "Expand POI"}" aria-expanded="${expanded}">${expanded ? "▴" : "▾"}</button>
-          <button class="icon-button delete-poi" type="button" title="Delete POI">x</button>
-        </div>
-        <div class="poi-card-details" ${expanded ? "" : "hidden"}>
-          <label>Label <input data-field="label" value="${escapeHtml(poi.label)}"></label>
-          <label>Description <textarea data-field="description">${escapeHtml(poi.description)}</textarea></label>
-          <div class="coordinate-grid">
-            <label>Latitude <input data-coordinate="lat" type="number" min="-90" max="90" step="any" value="${poi.position.lat.toFixed(6)}"></label>
-            <label>Longitude <input data-coordinate="lng" type="number" min="-180" max="180" step="any" value="${poi.position.lng.toFixed(6)}"></label>
-          </div>
-          <div class="coordinate-error" aria-live="polite"></div>
-          <label>Suggest nearby POIs
-            <select class="nearby-select" data-nearby="${poi.id}">
-              <option value="">Load nearby suggestions...</option>
-            </select>
-          </label>
-          <div class="mini-grid">
-            <label>Marker display
-              <select data-field="display_mode">
-                <option value="auto" ${poi.display_mode === "auto" ? "selected" : ""}>Project default</option>
-                <option value="icon" ${poi.display_mode === "icon" ? "selected" : ""}>Icon</option>
-                <option value="text" ${poi.display_mode === "text" ? "selected" : ""}>Short Text</option>
-                <option value="reference" ${poi.display_mode === "reference" ? "selected" : ""}>Letter / Number</option>
-              </select>
-            </label>
-            <label>Short text
-              <input data-field="short_text" maxlength="10" placeholder="Bridge" value="${escapeHtml(poi.short_text || "")}">
-            </label>
-          </div>
-          <div class="mini-grid">
-            <label>Category
-              <select data-field="category">
-                ${categoryOptions.map(([value, label]) => `<option value="${value}" ${poi.category === value ? "selected" : ""}>${label}</option>`).join("")}
-              </select>
-            </label>
-            <label>Icon
-              <select data-field="icon">
-                ${materialIcons.map((icon) => `<option value="${icon}" ${normalizeMaterialIcon(poi.icon) === icon ? "selected" : ""}>${icon}</option>`).join("")}
-              </select>
-            </label>
-          </div>
-          <label class="check-row"><input data-field="use_category_defaults" type="checkbox" ${poi.use_category_defaults !== false ? "checked" : ""}> Use category defaults</label>
-          <div class="mini-grid">
-            <label>Color <input data-field="color" type="color" value="${poi.color}"></label>
-            <label class="check-row"><input data-field="selected" type="checkbox" ${poi.selected ? "checked" : ""}> Include in route</label>
-          </div>
-          <label class="check-row"><input data-field="show_label" type="checkbox" ${poi.show_label ? "checked" : ""}> Show label</label>
-        </div>
-      </article>
-    `;
-  }).join("");
-}
-
-function bindPoiList() {
-  el("poi-list").addEventListener("input", (event) => {
-    const coordinate = event.target.dataset.coordinate;
-    const card = event.target.closest(".editor-card");
-    const poi = card && project.pois.find((item) => item.id === card.dataset.id);
-    if (!poi) return;
-    if (event.target.dataset.field === "short_text") {
-      poi.short_text = event.target.value.slice(0, 10);
-      const markerValue = markerText(poi, project.pois.indexOf(poi));
-      const mapValue = poiMarkers.get(poi.id)?.getElement().querySelector(".poi-pin > span");
-      if (mapValue) mapValue.textContent = markerValue;
-      const previewValue = card.querySelector(".marker-preview > span");
-      if (previewValue) previewValue.textContent = markerValue;
-      renderLegend();
-      return;
-    }
-    if (!coordinate) return;
-    applyCoordinateInput(event.target, card, poi, coordinate);
-  });
-  el("poi-list").addEventListener("change", async (event) => {
-    const card = event.target.closest(".editor-card");
-    if (!card) return;
-    const poi = project.pois.find((item) => item.id === card.dataset.id);
-    if (!poi) return;
-
-    const coordinate = event.target.dataset.coordinate;
-    if (coordinate) {
-      if (applyCoordinateInput(event.target, card, poi, coordinate)) {
-        await fetchNearbySuggestions(poi.id);
-      }
-      return;
-    }
-
-    if (event.target.matches(".nearby-select")) {
-      if (!event.target.value) {
-        await fetchNearbySuggestions(poi.id);
-        return;
-      }
-      const suggestion = JSON.parse(event.target.value);
-      poi.label = suggestion.name;
-      poi.position = { lat: suggestion.lat, lng: suggestion.lng };
-      renderPois();
-      if (project.route_mode !== "manual") buildRoute(false);
-      return;
-    }
-
-    const field = event.target.dataset.field;
-    if (!field) return;
-    poi[field] = event.target.type === "checkbox" ? event.target.checked : event.target.value;
-    if (field === "category" && poi.use_category_defaults !== false) {
-      const defaults = categoryDefaults[poi.category] || categoryDefaults.other;
-      poi.color = defaults.color;
-      poi.icon = defaults.icon;
-    }
-    if (["color", "icon"].includes(field)) poi.use_category_defaults = false;
-    if (field === "use_category_defaults" && poi.use_category_defaults) {
-      const defaults = categoryDefaults[poi.category] || categoryDefaults.other;
-      poi.color = defaults.color;
-      poi.icon = defaults.icon;
-    }
-    renderPois();
-    renderLegend();
-    if (project.route_mode !== "manual" && field === "selected") buildRoute(false);
-  });
-  el("poi-list").addEventListener("click", async (event) => {
-    const select = event.target.closest(".nearby-select");
-    if (select && select.options.length === 1) {
-      await fetchNearbySuggestions(select.dataset.nearby);
-      return;
-    }
-    const card = event.target.closest(".editor-card");
-    if (!card) return;
-    if (event.target.closest(".delete-poi")) {
-      expandedPoiIds.delete(card.dataset.id);
-      project.pois = project.pois.filter((item) => item.id !== card.dataset.id);
-      renderPois();
-      if (project.route_mode !== "manual") buildRoute(false);
-      return;
-    }
-    const header = event.target.closest(".editor-card-header");
-    if (!header || event.target.closest("input, label, .drag-handle")) return;
-    togglePoiCard(card.dataset.id);
-  });
-  new Sortable(el("poi-list"), {
-    handle: ".drag-handle",
-    animation: 130,
-    onEnd: (event) => {
-      const [moved] = project.pois.splice(event.oldIndex, 1);
-      project.pois.splice(event.newIndex, 0, moved);
-      renderPois();
-      if (project.route_mode !== "manual") buildRoute(false);
-    },
-  });
-}
-
-function togglePoiCard(poiId) {
-  if (expandedPoiIds.has(poiId)) expandedPoiIds.delete(poiId);
-  else expandedPoiIds.add(poiId);
-  renderPoiList();
-}
-
-function applyCoordinateInput(input, card, poi, coordinate) {
-  const value = Number(input.value);
-  const valid = Number.isFinite(value) && (
-    coordinate === "lat" ? value >= -90 && value <= 90 : value >= -180 && value <= 180
-  );
-  card.querySelector(".coordinate-error").textContent = valid
-    ? ""
-    : `${coordinate === "lat" ? "Latitude" : "Longitude"} is outside its valid range.`;
-  input.classList.toggle("invalid", !valid);
-  if (!valid) return false;
-  poi.position[coordinate] = value;
-  poiMarkers.get(poi.id)?.setLngLat([poi.position.lng, poi.position.lat]);
-  if (project.route_mode !== "manual") buildRoute(false);
-  return true;
-}
-
-async function fetchNearbySuggestions(poiId) {
-  const poi = project.pois.find((item) => item.id === poiId);
-  const select = document.querySelector(`[data-nearby="${CSS.escape(poiId)}"]`);
-  if (!poi || !select) return;
-  select.innerHTML = `<option value="">Loading nearby places...</option>`;
-  try {
-    const response = await fetch(apiUrl(`/api/nearby?lat=${poi.position.lat}&lng=${poi.position.lng}`));
-    if (!response.ok) throw new Error("Nearby service unavailable");
-    const suggestions = await response.json();
-    select.innerHTML = `<option value="">Choose a nearby place</option>${suggestions.map((item) => (
-      `<option value="${escapeHtml(JSON.stringify(item))}">${escapeHtml(item.name)} · ${escapeHtml(item.category)}</option>`
-    )).join("")}`;
-    if (!suggestions.length) select.innerHTML = `<option value="">No named places found nearby</option>`;
-  } catch {
-    select.innerHTML = `<option value="">Suggestions unavailable; manual entry still works</option>`;
-  }
-}
-
-async function buildRoute(notify = true) {
-  clearRouteEditHandles();
-  recordRouteState();
-  const selected = project.pois.filter((poi) => poi.selected).map((poi) => poi.position);
-  if (project.route_mode === "manual") {
-    drawPurpose = "route";
-    draw.changeMode("draw_line_string");
-    setStatus("Click map to draw route; double-click to finish");
-    return;
-  }
-  if (selected.length < 2) {
-    project.route = selected;
+map.on("click", (event) => {
+  if (state.mode === "draw") {
+    state.route.push([event.lngLat.lng, event.lngLat.lat]);
     renderRoute();
-    if (notify) showToast("Select at least two POIs for a route");
     return;
   }
-  if (project.route_mode === "walking") {
-    setStatus("Finding walking route...");
-    try {
-      const response = await fetch(apiUrl("/api/route/walking"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ coordinates: selected }),
-      });
-      if (!response.ok) throw new Error();
-      project.route = (await response.json()).coordinates;
-    } catch {
-      project.route = selected;
-      showToast("Walking route unavailable; using straight lines");
+  if (state.mode === "add-poi") {
+    addPoiAt([event.lngLat.lng, event.lngLat.lat]);
+  }
+});
+
+map.on("dblclick", (event) => {
+  event.preventDefault();
+  if (state.mode === "draw") {
+    const last = state.route.at(-1);
+    const previous = state.route.at(-2);
+    if (last && previous && last[0] === previous[0] && last[1] === previous[1]) {
+      state.route.pop();
     }
-  } else {
-    project.route = selected;
-  }
-  renderRoute();
-  setStatus("Ready");
-  if (notify) showToast("Route updated");
-}
-
-function cloneRoute(route = project.route) {
-  return route.map((point) => ({ lat: point.lat, lng: point.lng }));
-}
-
-function recordRouteState() {
-  routeUndoStack.push(cloneRoute());
-  if (routeUndoStack.length > 50) routeUndoStack.shift();
-  routeRedoStack = [];
-  updateRouteHistoryControls();
-}
-
-function restoreRoute(route) {
-  project.route = cloneRoute(route);
-  selectedRouteVertex = null;
-  renderRoute();
-  updateRouteHistoryControls();
-}
-
-function undoRoute() {
-  if (!routeUndoStack.length) return;
-  routeRedoStack.push(cloneRoute());
-  restoreRoute(routeUndoStack.pop());
-}
-
-function redoRoute() {
-  if (!routeRedoStack.length) return;
-  routeUndoStack.push(cloneRoute());
-  restoreRoute(routeRedoStack.pop());
-}
-
-function updateRouteHistoryControls() {
-  el("undo-route").disabled = routeUndoStack.length === 0;
-  el("redo-route").disabled = routeRedoStack.length === 0;
-  el("revert-route").disabled = lastSavedRoute.length === 0;
-}
-
-function renderRoute() {
-  if (!styleReady) return;
-  map.getSource("plainmap-route")?.setData(routeGeoJSON());
-  map.setPaintProperty("plainmap-route-line", "line-color", project.palette.route);
-  map.setLayoutProperty("plainmap-route-arrows", "visibility", project.show_arrows ? "visible" : "none");
-  if (routeEditMode) renderRouteEditHandles();
-  renderLegend();
-}
-
-function toggleRouteEditMode(force) {
-  routeEditMode = typeof force === "boolean" ? force : !routeEditMode;
-  el("edit-route").textContent = `Edit mode: ${routeEditMode ? "on" : "off"}`;
-  el("edit-route").classList.toggle("active", routeEditMode);
-  el("route-edit-help").innerHTML = routeEditMode
-    ? "<strong>Editing mode:</strong> drag a large handle to move it, click the route to add a vertex, or right-click/select + Delete to remove one."
-    : "<strong>Viewing mode:</strong> your route is protected. Turn on Edit Mode to reveal large vertex handles.";
-  if (routeEditMode) {
-    if (project.route.length < 2) {
-      routeEditMode = false;
-      el("edit-route").textContent = "Edit mode: off";
-      return showToast("Build a route first");
-    }
-    renderRouteEditHandles();
-    showToast("Route edit mode enabled");
-  } else {
-    clearRouteEditHandles();
-  }
-}
-
-function renderRouteEditHandles() {
-  clearRouteEditHandles(false);
-  project.route.forEach((point, index) => {
-    const node = document.createElement("button");
-    node.className = `route-vertex ${selectedRouteVertex === index ? "selected" : ""}`;
-    node.type = "button";
-    node.title = `Route vertex ${index + 1}`;
-    node.dataset.vertexIndex = String(index);
-    const selectVertex = (event) => {
-      event.stopPropagation();
-      selectedRouteVertex = index;
-      routeEditMarkers.forEach((entry) => entry.getElement().classList.remove("selected"));
-      node.classList.add("selected");
-      node.focus();
-    };
-    node.addEventListener("click", selectVertex);
-    node.addEventListener("pointerup", selectVertex);
-    node.addEventListener("contextmenu", (event) => {
-      event.preventDefault();
-      deleteRouteVertex(index);
-    });
-    // Circular edit handles are anchored at their center; POI pins use their
-    // bottom-center tip above. Both positions are owned by MapLibre.
-    const marker = new maplibregl.Marker({
-      element: node,
-      draggable: true,
-      anchor: "center",
-      offset: [0, 0],
-    })
-      .setLngLat([point.lng, point.lat])
-      .addTo(map);
-    marker.on("dragend", () => {
-      recordRouteState();
-      const location = marker.getLngLat();
-      project.route[index] = { lat: location.lat, lng: location.lng };
-      renderRoute();
-    });
-    routeEditMarkers.push(marker);
-  });
-}
-
-function clearRouteEditHandles(disable = true) {
-  routeEditMarkers.forEach((marker) => marker.remove());
-  routeEditMarkers = [];
-  selectedRouteVertex = null;
-  if (disable) {
-    routeEditMode = false;
-    el("edit-route").textContent = "Edit mode: off";
-    el("edit-route").classList.remove("active");
-  }
-}
-
-function deleteRouteVertex(index) {
-  if (project.route.length <= 2) {
-    showToast("A route needs at least two vertices");
+    finishDrawing();
     return;
   }
-  recordRouteState();
-  project.route.splice(index, 1);
-  selectedRouteVertex = null;
+  if (state.mode === "edit" || state.mode === "add-poi") return;
+});
+
+map.on("mousedown", "route-vertices", (event) => {
+  if (state.mode !== "edit" || !event.features?.length) return;
+  event.preventDefault();
+  state.dragIndex = Number(event.features[0].properties.index);
+  map.dragPan.disable();
+});
+
+map.on("mousemove", (event) => {
+  if (state.dragIndex === null) return;
+  state.route[state.dragIndex] = [event.lngLat.lng, event.lngLat.lat];
   renderRoute();
-}
+});
 
-function handleRouteLineClick(event) {
-  if (!routeEditMode || project.route.length < 2) return;
-  const clicked = map.project(event.lngLat);
-  let insertAt = 1;
-  let closest = Infinity;
-  for (let index = 0; index < project.route.length - 1; index += 1) {
-    const a = map.project([project.route[index].lng, project.route[index].lat]);
-    const b = map.project([project.route[index + 1].lng, project.route[index + 1].lat]);
-    const distance = distanceToSegment(clicked, a, b);
-    if (distance < closest) {
-      closest = distance;
-      insertAt = index + 1;
-    }
-  }
-  recordRouteState();
-  project.route.splice(insertAt, 0, { lat: event.lngLat.lat, lng: event.lngLat.lng });
-  selectedRouteVertex = insertAt;
-  renderRoute();
-}
+map.on("mouseup", () => {
+  if (state.dragIndex === null) return;
+  state.dragIndex = null;
+  map.dragPan.enable();
+  setMessage("Path updated");
+});
 
-function distanceToSegment(point, start, end) {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  if (dx === 0 && dy === 0) return Math.hypot(point.x - start.x, point.y - start.y);
-  const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy)));
-  return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
-}
+map.on("mouseenter", "route-vertices", () => {
+  if (state.mode === "edit") map.getCanvas().style.cursor = "grab";
+});
+map.on("mouseleave", "route-vertices", () => {
+  map.getCanvas().style.cursor = state.mode === "draw" ? "crosshair" : "";
+});
+map.on("move", updateOverlays);
+map.on("resize", updateOverlays);
 
-function handleDrawCreate(event) {
-  const feature = event.features[0];
-  draw.delete(feature.id);
-  if (drawPurpose === "route" && feature.geometry.type === "LineString") {
-    recordRouteState();
-    project.route = feature.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }));
-    project.route_mode = "manual";
-    el("route-mode").value = "manual";
-    renderRoute();
-    showToast("Manual route added");
-  } else if (drawPurpose === "parking" && feature.geometry.type === "Polygon") {
-    project.parking.push({
-      id: uuid(),
-      label: `Parking ${project.parking.length + 1}`,
-      kind: "recommended",
-      coordinates: feature.geometry.coordinates[0].slice(0, -1).map(([lng, lat]) => ({ lat, lng })),
-      color: project.palette.parking,
-      opacity: 0.35,
-      border_color: "#6F3EB8",
-      show_icon: true,
-    });
-    renderParking();
-    showToast("Parking area added");
-  }
-  drawPurpose = null;
-  setStatus("Ready");
-}
+elements.fileInput.addEventListener("change", async () => {
+  const file = elements.fileInput.files[0];
+  if (!file) return;
+  await importFile(file);
+  elements.fileInput.value = "";
+});
 
-function handleDrawUpdate(event) {
-  if (!activeParkingEditId) return;
-  const feature = event.features[0];
-  const area = project.parking.find((item) => item.id === activeParkingEditId);
-  if (area && feature.geometry.type === "Polygon") {
-    area.coordinates = feature.geometry.coordinates[0].slice(0, -1).map(([lng, lat]) => ({ lat, lng }));
-    renderParking(false);
-  }
-}
-
-function handleDrawDelete() {
-  if (activeParkingEditId) {
-    project.parking = project.parking.filter((area) => area.id !== activeParkingEditId);
-    activeParkingEditId = null;
-    renderParking();
-  }
-}
-
-function renderParking(refreshEditor = true) {
-  if (!styleReady) return;
-  map.getSource("plainmap-parking")?.setData(parkingGeoJSON());
-  parkingLabelMarkers.forEach((marker) => marker.remove());
-  parkingLabelMarkers.clear();
-  project.parking.forEach((area) => {
-    if (!area.show_icon || !area.coordinates.length) return;
-    const center = area.coordinates.reduce(
-      (sum, point) => ({ lat: sum.lat + point.lat / area.coordinates.length, lng: sum.lng + point.lng / area.coordinates.length }),
-      { lat: 0, lng: 0 }
-    );
-    const node = document.createElement("div");
-    node.className = "parking-map-label";
-    node.style.color = area.border_color;
-    node.innerHTML = `<span class="material-symbols-outlined">local_parking</span> ${escapeHtml(area.label)}`;
-    parkingLabelMarkers.set(area.id, new maplibregl.Marker({ element: node })
-      .setLngLat([center.lng, center.lat])
-      .addTo(map));
-  });
-  if (refreshEditor) renderParkingList();
-  renderLegend();
-}
-
-function renderParkingList() {
-  el("parking-list").innerHTML = project.parking.map((area) => `
-    <article class="editor-card" data-id="${area.id}">
-      <div class="editor-card-header">
-        <span class="marker-preview" style="background:${area.color}"><span class="material-symbols-outlined">local_parking</span></span>
-        <strong>${escapeHtml(area.label)}</strong>
-        <button class="icon-button delete-parking">x</button>
-      </div>
-      <label>Label <input data-parking-field="label" value="${escapeHtml(area.label)}"></label>
-      <label>Type
-        <select data-parking-field="kind">
-          ${["recommended", "overflow", "unavailable"].map((kind) => `<option ${area.kind === kind ? "selected" : ""}>${kind}</option>`).join("")}
-        </select>
-      </label>
-      <div class="mini-grid">
-        <label>Fill <input data-parking-field="color" type="color" value="${area.color}"></label>
-        <label>Border <input data-parking-field="border_color" type="color" value="${area.border_color}"></label>
-      </div>
-      <label>Opacity <input data-parking-field="opacity" type="range" min="0" max="1" step=".05" value="${area.opacity}"></label>
-      <label class="check-row"><input data-parking-field="show_icon" type="checkbox" ${area.show_icon ? "checked" : ""}> Show P icon</label>
-      <button class="button secondary edit-parking">Edit shape</button>
-    </article>
-  `).join("");
-}
-
-function bindParkingList() {
-  el("parking-list").addEventListener("change", (event) => {
-    const card = event.target.closest(".editor-card");
-    const area = card && project.parking.find((item) => item.id === card.dataset.id);
-    const field = event.target.dataset.parkingField;
-    if (!area || !field) return;
-    let value = event.target.type === "checkbox" ? event.target.checked : event.target.value;
-    if (field === "opacity") value = Number(value);
-    area[field] = value;
-    if (field === "kind") {
-      area.color = value === "overflow" ? project.palette.overflow : value === "unavailable" ? "#777777" : project.palette.parking;
-    }
-    renderParking();
-  });
-  el("parking-list").addEventListener("click", (event) => {
-    const card = event.target.closest(".editor-card");
-    if (!card) return;
-    if (event.target.matches(".delete-parking")) {
-      project.parking = project.parking.filter((item) => item.id !== card.dataset.id);
-      renderParking();
-    }
-    if (event.target.matches(".edit-parking")) startParkingEdit(card.dataset.id);
-  });
-}
-
-function startParkingEdit(id) {
-  const area = project.parking.find((item) => item.id === id);
-  if (!area) return;
-  draw.deleteAll();
-  const ring = area.coordinates.map((point) => [point.lng, point.lat]);
-  ring.push([...ring[0]]);
-  const featureIds = draw.add({
-    type: "Feature",
-    properties: {},
-    geometry: { type: "Polygon", coordinates: [ring] },
-  });
-  activeParkingEditId = id;
-  draw.changeMode("direct_select", { featureId: featureIds[0] });
-  showToast("Drag, add, or delete parking vertices");
-}
-
-function renderImportedFeatures(fit = false) {
-  if (!styleReady) return;
-  const visibleData = importedLayerGeoJSON();
-  map.getSource("plainmap-imported")?.setData(visibleData);
-  if (fit && visibleData.features.length) {
-    const coordinates = [];
-    for (const feature of visibleData.features) collectCoordinates(feature.geometry?.coordinates, coordinates);
-    fitCoordinateList(coordinates);
-  }
-  renderImportLayers();
-}
-
-function importedLayerGeoJSON() {
-  const features = project.imported_layers.length
-    ? project.imported_layers.filter((layer) => layer.visible !== false).flatMap((layer) => (
-      (layer.data?.features || []).map((feature) => ({
-        ...feature,
-        properties: { ...feature.properties, __plainmapLayerId: layer.id },
-      }))
-    ))
-    : project.imported_features.features || [];
-  return featureCollection(features);
-}
-
-function renderImportLayers() {
-  el("import-layer-list").innerHTML = project.imported_layers.map((layer, index) => `
-    <article class="layer-card" data-layer-id="${layer.id}">
-      <div class="layer-card-title">
-        <input data-layer-field="name" value="${escapeHtml(layer.name)}" aria-label="Layer name">
-        <button class="icon-button layer-up" ${index === 0 ? "disabled" : ""} title="Move layer up">↑</button>
-        <button class="icon-button layer-down" ${index === project.imported_layers.length - 1 ? "disabled" : ""} title="Move layer down">↓</button>
-        <button class="icon-button delete-layer" title="Delete layer">x</button>
-      </div>
-      <div class="button-row">
-        <label class="check-row"><input data-layer-field="visible" type="checkbox" ${layer.visible !== false ? "checked" : ""}> Visible</label>
-        <label class="check-row"><input data-layer-field="locked" type="checkbox" ${layer.locked ? "checked" : ""}> Locked</label>
-      </div>
-      ${(layer.data?.features || []).some((feature) => feature.geometry?.type.includes("LineString"))
-        ? `<button class="button secondary full convert-layer-route">Convert route to editable</button>`
-        : ""}
-    </article>
-  `).join("") || `<p class="hint">Imported reference layers will appear here.</p>`;
-}
-
-function bindImportLayers() {
-  el("import-layer-list").addEventListener("change", (event) => {
-    const card = event.target.closest("[data-layer-id]");
-    const layer = card && project.imported_layers.find((item) => item.id === card.dataset.layerId);
-    const field = event.target.dataset.layerField;
-    if (!layer || !field) return;
-    layer[field] = event.target.type === "checkbox" ? event.target.checked : event.target.value;
-    renderImportedFeatures();
-  });
-  el("import-layer-list").addEventListener("click", (event) => {
-    const card = event.target.closest("[data-layer-id]");
-    const index = card && project.imported_layers.findIndex((item) => item.id === card.dataset.layerId);
-    if (index === null || index < 0) return;
-    const layer = project.imported_layers[index];
-    if (event.target.closest(".delete-layer")) project.imported_layers.splice(index, 1);
-    if (event.target.closest(".layer-up") && index > 0) {
-      [project.imported_layers[index - 1], project.imported_layers[index]] = [layer, project.imported_layers[index - 1]];
-    }
-    if (event.target.closest(".layer-down") && index < project.imported_layers.length - 1) {
-      [project.imported_layers[index + 1], project.imported_layers[index]] = [layer, project.imported_layers[index + 1]];
-    }
-    if (event.target.closest(".convert-layer-route")) {
-      if (layer.locked) return showToast("Unlock this layer before converting its route");
-      const feature = layer.data.features.find((item) => item.geometry?.type === "LineString");
-      if (!feature) return showToast("This layer has no editable LineString route");
-      recordRouteState();
-      project.route = feature.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }));
-      project.route_mode = "manual";
-      el("route-mode").value = "manual";
-      renderRoute();
-      showToast("Imported route converted to an editable route");
-    }
-    renderImportedFeatures();
-  });
-}
-
-function collectCoordinates(value, output) {
-  if (!Array.isArray(value)) return;
-  if (value.length >= 2 && typeof value[0] === "number" && typeof value[1] === "number") output.push(value);
-  else value.forEach((child) => collectCoordinates(child, output));
-}
-
-function handleImportedPolygonClick(event) {
-  const feature = event.features?.[0];
-  if (!feature || !feature.geometry.type.includes("Polygon")) return;
-  const layer = project.imported_layers.find((item) => item.id === feature.properties?.__plainmapLayerId);
-  if (layer?.locked) return showToast("Unlock this layer before converting its polygons");
-  const coordinates = feature.geometry.type === "MultiPolygon"
-    ? feature.geometry.coordinates[0][0]
-    : feature.geometry.coordinates[0];
-  project.parking.push({
-    id: uuid(),
-    label: feature.properties?.label || feature.properties?.name || "Imported parking",
-    kind: "recommended",
-    coordinates: coordinates.slice(0, -1).map(([lng, lat]) => ({ lat, lng })),
-    color: project.palette.parking,
-    opacity: 0.35,
-    border_color: "#6F3EB8",
-    show_icon: true,
-  });
-  renderParking();
-  showToast("Imported polygon marked as parking");
-}
-
-function renderPaletteControls() {
-  el("palette-controls").innerHTML = Object.entries(paletteLabels).map(([key, label]) => `
-    <label>${label}<input type="color" data-palette="${key}" value="${project.palette[key]}"></label>
-  `).join("");
-}
-
-function applyPalette() {
-  document.documentElement.style.setProperty("--ink", project.palette.text);
-  document.documentElement.style.setProperty("--paper", project.palette.background);
-  el("map-tint").style.background = project.palette.background;
-  if (styleReady) {
-    map.setPaintProperty("plainmap-route-line", "line-color", project.palette.route);
-    map.setPaintProperty("plainmap-route-arrows", "text-color", project.palette.text);
-    map.setPaintProperty("plainmap-imported-line", "line-color", project.palette.route);
-    map.setPaintProperty("plainmap-imported-points", "circle-color", project.palette.poi);
-    map.setPaintProperty("plainmap-imported-points", "circle-stroke-color", project.palette.text);
-  }
-  renderPois();
-  renderParking();
-  renderLegend();
-}
-
-function setRotation(angle, mode = "custom", animate = true) {
-  const bearing = normalizeBearing(angle);
-  project.rotation = bearing;
-  project.orientation_mode = mode;
-  const camera = { bearing };
-  if (animate) map.easeTo({ ...camera, duration: 350 });
-  else map.jumpTo(camera);
-  el("rotation-slider").value = bearing;
-  el("rotation-output").value = `${Math.round(bearing)}°`;
-  el("map-frame").dataset.bearing = String(bearing);
-  document.querySelectorAll("[data-orientation]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.orientation === mode);
-  });
-  renderCompass();
-}
-
-function routeBearing() {
-  if (project.route.length < 2) return 0;
-  const start = project.route[0];
-  const end = project.route.at(-1);
-  const lat1 = start.lat * Math.PI / 180;
-  const lat2 = end.lat * Math.PI / 180;
-  const delta = (end.lng - start.lng) * Math.PI / 180;
-  const y = Math.sin(delta) * Math.cos(lat2);
-  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(delta);
-  return Math.atan2(y, x) * 180 / Math.PI;
-}
-
-function fitRoute(rotate = true) {
-  if (project.route.length < 2) return showToast("Build a route first");
-  if (rotate) setRotation(routeBearing(), "route");
-  fitCoordinateList(project.route.map((point) => [point.lng, point.lat]));
-}
-
-function fitCoordinateList(coordinates) {
-  if (!coordinates.length) return;
-  const bounds = coordinates.reduce(
-    (box, coordinate) => box.extend(coordinate),
-    new maplibregl.LngLatBounds(coordinates[0], coordinates[0])
-  );
-  map.fitBounds(bounds, { padding: 70, bearing: project.rotation, duration: 450 });
-}
-
-function outputAspectRatio() {
-  const width = Number(el("export-width").value);
-  const height = Number(el("export-height").value);
-  return width > 0 && height > 0 ? width / height : 1;
-}
-
-function updateBoundaryCaption() {
-  const caption = el("export-boundary").querySelector(".boundary-caption");
-  caption.textContent =
-    `${project.export.width} × ${project.export.height} · ${formatAspect(project.export_boundary.aspect_ratio)}`;
-}
-
-function fitLockedSize(width, height, ratio, maxWidth, maxHeight) {
-  let fittedWidth = Math.max(80, width);
-  let fittedHeight = Math.max(80, height);
-  const scale = Math.max(fittedWidth / ratio, fittedHeight);
-  fittedWidth = scale * ratio;
-  fittedHeight = scale;
-  const clampScale = Math.min(1, maxWidth / fittedWidth, maxHeight / fittedHeight);
-  return {
-    width: fittedWidth * clampScale,
-    height: fittedHeight * clampScale,
-  };
-}
-
-function applyExportDimensions(width, height, preset = "custom") {
-  const safeWidth = Math.max(320, Math.min(5000, Math.round(Number(width) || 1080)));
-  const safeHeight = Math.max(320, Math.min(5000, Math.round(Number(height) || 1350)));
-  project.export = { preset, width: safeWidth, height: safeHeight };
-  project.export_boundary.aspect_ratio = safeWidth / safeHeight;
-  el("export-preset").value = preset;
-  el("export-width").value = safeWidth;
-  el("export-height").value = safeHeight;
-  if (project.export_boundary.lock_aspect) {
-    project.export_boundary.height =
-      project.export_boundary.width / project.export_boundary.aspect_ratio;
-  }
-  renderExportBoundary(false);
-}
-
-function renderExportBoundary(recenter = false) {
-  if (!map) return;
-  const boundary = el("export-boundary");
-  const settings = project.export_boundary;
-  boundary.hidden = !settings.visible;
-  if (!settings.center) settings.center = { ...project.center };
-  if (recenter || !Number.isFinite(settings.width) || !Number.isFinite(settings.height)) {
-    settings.center = { lat: map.getCenter().lat, lng: map.getCenter().lng };
-    settings.width = Math.min(320, el("map-frame").clientWidth * 0.72);
-    settings.height = settings.width / settings.aspect_ratio;
-  }
-  const center = map.project([settings.center.lng, settings.center.lat]);
-  const maxWidth = Math.max(100, el("map-frame").clientWidth - 24);
-  const maxHeight = Math.max(100, el("map-frame").clientHeight - 24);
-  let width = Math.min(settings.width, maxWidth);
-  let height = Math.min(settings.height, maxHeight);
-  if (settings.lock_aspect) {
-    const ratio = settings.aspect_ratio || outputAspectRatio();
-    ({ width, height } = fitLockedSize(width, height, ratio, maxWidth, maxHeight));
-  }
-  settings.width = width;
-  settings.height = height;
-  boundary.style.left = `${center.x}px`;
-  boundary.style.top = `${center.y}px`;
-  boundary.style.width = `${width}px`;
-  boundary.style.height = `${height}px`;
-  boundary.style.transform = `translate(-50%, -50%) rotate(${settings.rotation}deg)`;
-  updateBoundaryCaption();
-  updateBoundaryGeography();
-}
-
-function formatAspect(ratio) {
-  const known = [
-    [1, "1:1"],
-    [4 / 5, "4:5"],
-    [9 / 16, "9:16"],
-    [16 / 9, "16:9"],
-    [4 / 3, "4:3"],
-    [3 / 4, "3:4"],
-    [2 / 3, "2:3"],
-  ];
-  const match = known.find(([value]) => Math.abs(value - ratio) < 0.01);
-  return match ? match[1] : `${ratio.toFixed(2)}:1`;
-}
-
-function boundaryScreenState() {
-  const boundary = el("export-boundary");
-  if (boundary.hidden) {
-    const center = map.project([project.export_boundary.center.lng, project.export_boundary.center.lat]);
-    return {
-      x: center.x,
-      y: center.y,
-      width: project.export_boundary.width,
-      height: project.export_boundary.height,
-      rotation: project.export_boundary.rotation || 0,
-    };
-  }
-  return {
-    x: parseFloat(boundary.style.left) || el("map-frame").clientWidth / 2,
-    y: parseFloat(boundary.style.top) || el("map-frame").clientHeight / 2,
-    width: boundary.offsetWidth,
-    height: boundary.offsetHeight,
-    rotation: project.export_boundary.rotation || 0,
-  };
-}
-
-function rotatedBoundaryCorners(state) {
-  const radians = state.rotation * Math.PI / 180;
-  const cosine = Math.cos(radians);
-  const sine = Math.sin(radians);
-  return [
-    [-state.width / 2, -state.height / 2],
-    [state.width / 2, -state.height / 2],
-    [state.width / 2, state.height / 2],
-    [-state.width / 2, state.height / 2],
-  ].map(([x, y]) => ({
-    x: state.x + x * cosine - y * sine,
-    y: state.y + x * sine + y * cosine,
-  }));
-}
-
-function updateBoundaryGeography() {
-  if (!map || !project.export_boundary) return;
-  const state = boundaryScreenState();
-  const center = map.unproject([state.x, state.y]);
-  const corners = rotatedBoundaryCorners(state).map((point) => map.unproject([point.x, point.y]));
-  project.export_boundary.center = { lat: center.lat, lng: center.lng };
-  project.export_boundary.width = state.width;
-  project.export_boundary.height = state.height;
-  if (!project.export_boundary.lock_aspect) {
-    project.export_boundary.aspect_ratio = state.width / state.height;
-    const outputHeight = Math.max(
-      320,
-      Math.min(5000, Math.round(project.export.width / project.export_boundary.aspect_ratio))
-    );
-    project.export.preset = "custom";
-    project.export.height = outputHeight;
-    el("export-preset").value = "custom";
-    el("export-height").value = outputHeight;
-  }
-  project.export_boundary.bounds = {
-    west: Math.min(...corners.map((point) => point.lng)),
-    south: Math.min(...corners.map((point) => point.lat)),
-    east: Math.max(...corners.map((point) => point.lng)),
-    north: Math.max(...corners.map((point) => point.lat)),
-  };
-  updateBoundaryCaption();
-}
-
-function bindExportBoundary() {
-  const boundary = el("export-boundary");
-  boundary.querySelector(".boundary-caption").addEventListener("pointerdown", (event) => {
-    const state = boundaryScreenState();
-    boundaryInteraction = { type: "move", startX: event.clientX, startY: event.clientY, state };
-    event.currentTarget.setPointerCapture(event.pointerId);
+["dragenter", "dragover"].forEach((eventName) => {
+  elements.dropZone.addEventListener(eventName, (event) => {
     event.preventDefault();
+    elements.dropZone.classList.add("dragging");
   });
-  boundary.querySelectorAll(".boundary-handle").forEach((handle) => {
-    handle.addEventListener("pointerdown", (event) => {
-      const state = boundaryScreenState();
-      const frameRect = el("map-frame").getBoundingClientRect();
-      boundaryInteraction = {
-        type: "resize",
-        handle: handle.dataset.handle,
-        centerX: frameRect.left + state.x,
-        centerY: frameRect.top + state.y,
-        state,
-      };
-      event.currentTarget.setPointerCapture(event.pointerId);
-      event.stopPropagation();
-      event.preventDefault();
-    });
-  });
-  boundary.querySelector(".boundary-rotate").addEventListener("pointerdown", (event) => {
-    const state = boundaryScreenState();
-    const frameRect = el("map-frame").getBoundingClientRect();
-    boundaryInteraction = {
-      type: "rotate",
-      centerX: frameRect.left + state.x,
-      centerY: frameRect.top + state.y,
-      startAngle: Math.atan2(event.clientY - (frameRect.top + state.y), event.clientX - (frameRect.left + state.x)),
-      rotation: state.rotation,
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
-    event.stopPropagation();
+});
+
+["dragleave", "drop"].forEach((eventName) => {
+  elements.dropZone.addEventListener(eventName, (event) => {
     event.preventDefault();
+    elements.dropZone.classList.remove("dragging");
   });
-  // Global listeners keep resize/rotate responsive even when the pointer leaves
-  // the small handle or crosses the map frame while dragging.
-  window.addEventListener("pointermove", handleBoundaryPointerMove);
-  window.addEventListener("pointerup", finishBoundaryInteraction);
-  window.addEventListener("pointercancel", finishBoundaryInteraction);
-}
+});
 
-function handleBoundaryPointerMove(event) {
-  if (!boundaryInteraction) return;
-  const boundary = el("export-boundary");
-  const frame = el("map-frame");
-  if (boundaryInteraction.type === "move") {
-    const x = Math.max(20, Math.min(frame.clientWidth - 20, boundaryInteraction.state.x + event.clientX - boundaryInteraction.startX));
-    const y = Math.max(20, Math.min(frame.clientHeight - 20, boundaryInteraction.state.y + event.clientY - boundaryInteraction.startY));
-    boundary.style.left = `${x}px`;
-    boundary.style.top = `${y}px`;
-  } else if (boundaryInteraction.type === "resize") {
-    let width = Math.max(80, Math.abs(event.clientX - boundaryInteraction.centerX) * 2);
-    let height = Math.max(80, Math.abs(event.clientY - boundaryInteraction.centerY) * 2);
-    if (project.export_boundary.lock_aspect) {
-      ({ width, height } = fitLockedSize(
-        width,
-        height,
-        project.export_boundary.aspect_ratio,
-        frame.clientWidth - 20,
-        frame.clientHeight - 20
-      ));
-    }
-    boundary.style.width = `${Math.min(width, frame.clientWidth - 20)}px`;
-    boundary.style.height = `${Math.min(height, frame.clientHeight - 20)}px`;
-  } else {
-    const angle = Math.atan2(event.clientY - boundaryInteraction.centerY, event.clientX - boundaryInteraction.centerX);
-    project.export_boundary.rotation = normalizeBearing(
-      boundaryInteraction.rotation + (angle - boundaryInteraction.startAngle) * 180 / Math.PI
-    );
-    boundary.style.transform = `translate(-50%, -50%) rotate(${project.export_boundary.rotation}deg)`;
+elements.dropZone.addEventListener("drop", async (event) => {
+  const file = event.dataTransfer?.files?.[0];
+  if (file) await importFile(file);
+});
+
+async function importFile(file) {
+  if (!/\.(kml|kmz)$/i.test(file.name)) {
+    elements.importStatus.textContent = "Choose a KML or KMZ file";
+    setMessage("That file is not KML or KMZ", true);
+    return;
   }
-  updateBoundaryGeography();
-}
+  elements.importStatus.textContent = `Reading ${file.name}...`;
+  setMessage("Importing map data");
 
-function finishBoundaryInteraction(event) {
-  if (!boundaryInteraction) return;
-  const captureTarget = event.target;
-  if (captureTarget?.hasPointerCapture?.(event.pointerId)) {
-    captureTarget.releasePointerCapture(event.pointerId);
-  }
-  boundaryInteraction = null;
-  updateBoundaryGeography();
-}
-
-function centerBoundaryOnRoute() {
-  if (!project.route.length) return showToast("Build a route first");
-  const points = project.route.map((point) => map.project([point.lng, point.lat]));
-  const state = boundaryScreenState();
-  el("export-boundary").style.left = `${points.reduce((sum, point) => sum + point.x, 0) / points.length}px`;
-  el("export-boundary").style.top = `${points.reduce((sum, point) => sum + point.y, 0) / points.length}px`;
-  el("export-boundary").style.width = `${state.width}px`;
-  el("export-boundary").style.height = `${state.height}px`;
-  updateBoundaryGeography();
-}
-
-function fitBoundaryToRoute() {
-  if (project.route.length < 2) return showToast("Build a route first");
-  const points = project.route.map((point) => map.project([point.lng, point.lat]));
-  const minX = Math.min(...points.map((point) => point.x));
-  const maxX = Math.max(...points.map((point) => point.x));
-  const minY = Math.min(...points.map((point) => point.y));
-  const maxY = Math.max(...points.map((point) => point.y));
-  const frame = el("map-frame");
-  let width = Math.min(frame.clientWidth - 30, Math.max(120, maxX - minX + 70));
-  let height = Math.min(frame.clientHeight - 30, Math.max(120, maxY - minY + 70));
-  if (project.export_boundary.lock_aspect) {
-    ({ width, height } = fitLockedSize(
-      width,
-      height,
-      project.export_boundary.aspect_ratio,
-      frame.clientWidth - 20,
-      frame.clientHeight - 20
-    ));
-  }
-  const boundary = el("export-boundary");
-  boundary.style.left = `${(minX + maxX) / 2}px`;
-  boundary.style.top = `${(minY + maxY) / 2}px`;
-  boundary.style.width = `${Math.min(width, frame.clientWidth - 20)}px`;
-  boundary.style.height = `${Math.min(height, frame.clientHeight - 20)}px`;
-  updateBoundaryGeography();
-}
-
-function renderCompass() {
-  const compass = el("compass");
-  compass.hidden = !project.compass.visible;
-  compass.className = `compass ${project.compass.position} ${project.compass.locked ? "locked" : ""}`;
-  compass.style.width = `${project.compass.size}px`;
-  compass.style.height = `${project.compass.size}px`;
-  compass.style.color = project.compass.color;
-  if (Number.isFinite(project.compass.custom_position?.x)) {
-    compass.style.left = `${project.compass.custom_position.x}px`;
-    compass.style.top = `${project.compass.custom_position.y}px`;
-    compass.style.right = "auto";
-    compass.style.bottom = "auto";
-  } else {
-    compass.style.left = "";
-    compass.style.top = "";
-    compass.style.right = "";
-    compass.style.bottom = "";
-  }
-  // MapLibre bearing is clockwise camera rotation; north on screen moves by the inverse angle.
-  compass.querySelector(".compass-arrow").style.transform = `rotate(${-map.getBearing()}deg)`;
-}
-
-const legendLabels = {
-  meeting: "Meeting point",
-  parking: "Parking",
-  route: "Walking route",
-  photoStops: "Photo stops",
-  arrows: "Direction arrows",
-};
-
-function renderLegendControls() {
-  el("legend-toggles").innerHTML = Object.entries(legendLabels).map(([key, label]) => `
-    <label class="check-row"><input type="checkbox" data-legend-item="${key}" ${project.legend.items[key] ? "checked" : ""}> ${label}</label>
-  `).join("");
-}
-
-function renderLegend() {
-  const legend = el("legend");
-  legend.hidden = !project.legend.visible;
-  legend.style.width = `${project.legend.width}px`;
-  legend.style.height = project.legend.height ? `${project.legend.height}px` : "";
-  legend.classList.toggle("locked", project.legend.locked);
-  legend.style.left = `${project.legend.position.x}px`;
-  legend.style.top = `${project.legend.position.y}px`;
-  legend.style.bottom = "auto";
-  const items = [];
-  if (project.legend.items.meeting) items.push(`<div class="legend-item"><span class="legend-dot" style="background:${project.palette.meeting}"></span> Meeting point</div>`);
-  if (project.legend.items.parking) items.push(`<div class="legend-item"><span class="legend-icon" style="background:${project.palette.parking}"><span class="material-symbols-outlined">local_parking</span></span> Parking</div>`);
-  if (project.legend.items.route) items.push(`<div class="legend-item"><span class="legend-icon" style="background:${project.palette.route}"><span class="material-symbols-outlined">directions_walk</span></span> Walking route</div>`);
-  if (project.legend.items.photoStops) {
-    project.pois.forEach((poi, index) => {
-      const iconMode = poi.display_mode === "icon" || (poi.display_mode === "auto" && project.poi_marker_mode === "icons");
-      const symbol = iconMode
-        ? `<span class="legend-icon" style="background:${poi.color}"><span class="material-symbols-outlined">${escapeHtml(normalizeMaterialIcon(poi.icon))}</span></span>`
-        : `<span class="legend-icon legend-text-marker" style="background:${poi.color}">${escapeHtml(markerText(poi, index))}</span>`;
-      items.push(`<div class="legend-item">${symbol} ${escapeHtml(poi.label)}</div>`);
-    });
-    if (!project.pois.length) items.push(`<div class="legend-item"><span class="legend-dot" style="background:${project.palette.poi}"></span> Points of interest</div>`);
-  }
-  if (project.legend.items.arrows) items.push(`<div class="legend-item"><strong>↑</strong> Direction</div>`);
-  el("legend-content").innerHTML = items.join("");
-}
-
-function makeLegendDraggable() {
-  const legend = el("legend");
-  let drag = null;
-  legend.addEventListener("pointerdown", (event) => {
-    if (project.legend.locked) return;
-    if (event.offsetX > legend.clientWidth - 18 && event.offsetY > legend.clientHeight - 18) return;
-    drag = { x: event.clientX, y: event.clientY, left: legend.offsetLeft, top: legend.offsetTop };
-    legend.setPointerCapture(event.pointerId);
-  });
-  legend.addEventListener("pointermove", (event) => {
-    if (!drag) return;
-    legend.style.left = `${Math.max(0, drag.left + event.clientX - drag.x)}px`;
-    legend.style.top = `${Math.max(0, drag.top + event.clientY - drag.y)}px`;
-    legend.style.bottom = "auto";
-  });
-  legend.addEventListener("pointerup", () => {
-    if (!drag) return;
-    project.legend.position = { x: legend.offsetLeft, y: legend.offsetTop };
-    project.legend.width = legend.offsetWidth;
-    if (project.legend.snap) snapLayoutElement(legend, project.legend, false);
-    drag = null;
-  });
-  new ResizeObserver(() => {
-    if (project.legend.locked) return;
-    project.legend.width = legend.offsetWidth;
-    project.legend.height = legend.offsetHeight;
-  }).observe(legend);
-}
-
-function makeCompassDraggable() {
-  const compass = el("compass");
-  let drag = null;
-  compass.addEventListener("pointerdown", (event) => {
-    if (project.compass.locked) return;
-    drag = { x: event.clientX, y: event.clientY, left: compass.offsetLeft, top: compass.offsetTop };
-    compass.setPointerCapture(event.pointerId);
-  });
-  compass.addEventListener("pointermove", (event) => {
-    if (!drag) return;
-    compass.style.left = `${Math.max(0, drag.left + event.clientX - drag.x)}px`;
-    compass.style.top = `${Math.max(0, drag.top + event.clientY - drag.y)}px`;
-    compass.style.right = "auto";
-    compass.style.bottom = "auto";
-  });
-  compass.addEventListener("pointerup", () => {
-    if (!drag) return;
-    project.compass.custom_position = { x: compass.offsetLeft, y: compass.offsetTop };
-    if (project.compass.snap) snapLayoutElement(compass, project.compass, true);
-    drag = null;
-  });
-}
-
-function snapLayoutElement(node, settings, isCompass) {
-  const frame = el("map-frame");
-  const margin = 18;
-  const left = node.offsetLeft + node.offsetWidth / 2 < frame.clientWidth / 2;
-  const top = node.offsetTop + node.offsetHeight / 2 < frame.clientHeight / 2;
-  const x = left ? margin : frame.clientWidth - node.offsetWidth - margin;
-  const y = top ? margin : frame.clientHeight - node.offsetHeight - margin;
-  node.style.left = `${x}px`;
-  node.style.top = `${y}px`;
-  node.style.right = "auto";
-  node.style.bottom = "auto";
-  if (isCompass) {
-    settings.position = `${top ? "top" : "bottom"}-${left ? "left" : "right"}`;
-    settings.custom_position = {};
-    el("compass-position").value = settings.position;
-    renderCompass();
-  } else {
-    settings.position = { x, y };
-  }
-}
-
-async function geocodeLocation(query) {
-  setStatus("Searching...");
   try {
-    const response = await fetch(apiUrl(`/api/geocode?q=${encodeURIComponent(query)}`));
-    if (!response.ok) throw new Error((await response.json()).detail);
-    const results = await response.json();
-    el("geocode-results").innerHTML = results.map((result) => `
-      <button data-lat="${result.lat}" data-lng="${result.lng}">${escapeHtml(result.label)}</button>
-    `).join("") || `<span class="hint">No results found.</span>`;
+    const body = new FormData();
+    body.append("file", file);
+    const response = await fetch("/api/import", { method: "POST", body });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "Import failed.");
+    loadFeatures(payload.features || []);
+    elements.importStatus.textContent = `${file.name} loaded`;
+    setMessage(
+      `Loaded ${state.pois.length} POI${state.pois.length === 1 ? "" : "s"}`
+      + (state.route.length ? " and 1 walking path" : ""),
+    );
   } catch (error) {
-    showToast(error.message);
-  } finally {
-    setStatus("Ready");
+    elements.importStatus.textContent = error.message;
+    setMessage(error.message, true);
   }
 }
 
-async function uploadMapData(file, mode = "layer") {
-  const form = new FormData();
-  form.append("file", file);
-  setStatus(`Importing ${file.name}...`);
-  try {
-    const response = await fetch(apiUrl("/api/import"), { method: "POST", body: form });
-    if (!response.ok) throw new Error((await response.json()).detail);
-    const data = await response.json();
-    if (mode === "replace") {
-      project.pois = [];
-      project.route = [];
-      project.parking = [];
-      project.imported_layers = [];
-    }
-    if (mode === "merge") {
-      data.features.filter((feature) => feature.geometry?.type === "Point").forEach((feature) => {
-        const [lng, lat] = feature.geometry.coordinates;
-        addPoi({ lat, lng }, { label: feature.properties?.label || feature.properties?.name || "Imported point" });
-      });
-      const firstRoute = data.features.find((feature) => feature.geometry?.type === "LineString");
-      if (firstRoute) {
-        recordRouteState();
-        project.route = firstRoute.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }));
-        project.route_mode = "manual";
-        el("route-mode").value = "manual";
-      }
-    }
-    project.imported_layers.push({
-      id: uuid(),
-      name: file.name.replace(/\.[^.]+$/, "") || `Layer ${project.imported_layers.length + 1}`,
+elements.drawRoute.addEventListener("click", () => {
+  if (state.mode === "draw") return finishDrawing();
+  state.route = [];
+  setMode("draw");
+  elements.drawRoute.textContent = "Finish path";
+  setMessage("Click along the walking path");
+});
+
+elements.addPoi.addEventListener("click", () => {
+  setMode(state.mode === "add-poi" ? "view" : "add-poi");
+  setMessage(state.mode === "add-poi" ? "Click the map to place a POI" : "POI placement cancelled");
+});
+
+elements.hidePoiLabels.addEventListener("change", () => {
+  state.hidePoiLabels = elements.hidePoiLabels.checked;
+  renderPoiOverlay();
+  setMessage(state.hidePoiLabels ? "POI labels hidden" : "POI labels shown");
+});
+
+elements.editRoute.addEventListener("click", () => {
+  if (state.route.length < 2) return setMessage("Draw or import a path first", true);
+  setMode(state.mode === "edit" ? "view" : "edit");
+  setMessage(state.mode === "edit" ? "Drag the white route points to edit" : "Path editing finished");
+});
+
+elements.clearRoute.addEventListener("click", () => {
+  state.route = [];
+  setMode("view");
+  renderRoute();
+  setMessage("Walking path cleared");
+});
+
+elements.routeColor.addEventListener("input", (event) => {
+  state.colors.route = event.target.value;
+  document.documentElement.style.setProperty("--route-color", state.colors.route);
+  if (map.getLayer("route-line")) {
+    map.setPaintProperty("route-line", "line-color", state.colors.route);
+    map.setPaintProperty("route-vertices", "circle-stroke-color", state.colors.route);
+  }
+  updateRouteOverlay();
+  renderRouteMarkers();
+});
+
+elements.poiColor.addEventListener("input", (event) => {
+  state.colors.poi = event.target.value;
+  document.documentElement.style.setProperty("--poi-color", state.colors.poi);
+});
+
+elements.frameShape.addEventListener("change", updateFrameShape);
+elements.fitContent.addEventListener("click", fitContent);
+elements.exportPng.addEventListener("click", exportPng);
+window.addEventListener("resize", updateFrameShape);
+
+function emptyCollection() {
+  return { type: "FeatureCollection", features: [] };
+}
+
+function pointFeature(coordinates, label) {
+  return {
+    type: "Feature",
+    properties: {
+      label: label || "Point of interest",
       visible: true,
-      locked: mode === "layer",
-      data,
-    });
-    project.imported_features = featureCollection([]);
-    renderImportedFeatures(true);
-    renderRoute();
-    renderPois();
-    renderParking();
-    showToast(`Imported ${data.features.length} features ${mode === "layer" ? "as a reference layer" : ""}`);
-  } catch (error) {
-    showToast(error.message);
-  } finally {
-    setStatus("Ready");
-  }
-}
-
-function serializeProject() {
-  syncCameraState();
-  updateBoundaryGeography();
-  project.name = el("project-name").value.trim() || "Untitled map";
-  project.project_id ||= uuid();
-  project.owner_id ??= null;
-  project.detail_level = el("detail-level").value;
-  project.poi_marker_mode = el("poi-marker-mode").value;
-  project.route_mode = el("route-mode").value;
-  project.show_arrows = el("show-arrows").checked;
-  project.export = {
-    preset: el("export-preset").value,
-    width: Number(el("export-width").value),
-    height: Number(el("export-height").value),
-  };
-  project.export_boundary.enabled = el("boundary-enabled").checked;
-  project.export_boundary.visible = el("boundary-visible").checked;
-  project.export_boundary.lock_aspect = el("boundary-lock-aspect").checked;
-  return project;
-}
-
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function saveProject() {
-  lastSavedRoute = cloneRoute();
-  updateRouteHistoryControls();
-  downloadBlob(
-    new Blob([JSON.stringify(serializeProject(), null, 2)], { type: "application/json" }),
-    `${safeFilename(project.name)}.plainmap.json`
-  );
-}
-
-function safeFilename(value) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "plainmap";
-}
-
-async function loadProjectFile(file) {
-  try {
-    const data = JSON.parse(await file.text());
-    project = mergeProjectDefaults(data.properties?.plainmapProject || data);
-    lastSavedRoute = cloneRoute(project.route);
-    routeUndoStack = [];
-    routeRedoStack = [];
-    expandedPoiIds.clear();
-    clearRouteEditHandles();
-    syncUiFromProject();
-    map.jumpTo({
-      center: [project.center.lng, project.center.lat],
-      zoom: project.zoom,
-      bearing: project.rotation,
-    });
-    renderAll();
-    showToast("Project loaded");
-  } catch (error) {
-    showToast(`Could not load project: ${error.message}`);
-  }
-}
-
-function mergeProjectDefaults(data) {
-  const boundaryData = data.export_boundary || {
-    center: data.center || DEFAULT_PROJECT.export_boundary.center,
-  };
-  const migratedPreset = legacyExportPresets[data.export?.preset] || data.export?.preset;
-  return {
-    ...structuredClone(DEFAULT_PROJECT),
-    ...data,
-    version: 4,
-    poi_marker_mode: data.poi_marker_mode || "letters",
-    poi_simple_markers: data.poi_simple_markers === true,
-    workflow_stage: Math.max(0, Math.min(7, Number(data.workflow_stage || 0))),
-    quick_edit_mode: data.quick_edit_mode === true,
-    pois: (data.pois || []).map((poi) => ({
-      ...poi,
-      icon: normalizeMaterialIcon(poi.icon),
-      show_label: poi.show_label !== false,
-      display_mode: poi.display_mode || "auto",
-      short_text: poi.short_text || "",
-      use_category_defaults: poi.use_category_defaults === true,
-    })),
-    palette: { ...AUSTIN_PALETTE, ...data.palette },
-    compass: { ...DEFAULT_PROJECT.compass, ...data.compass },
-    legend: {
-      ...DEFAULT_PROJECT.legend,
-      ...data.legend,
-      items: { ...DEFAULT_PROJECT.legend.items, ...data.legend?.items },
     },
-    export: { ...DEFAULT_PROJECT.export, ...data.export, preset: migratedPreset || DEFAULT_PROJECT.export.preset },
-    export_boundary: {
-      ...DEFAULT_PROJECT.export_boundary,
-      ...boundaryData,
-      center: { ...DEFAULT_PROJECT.export_boundary.center, ...boundaryData.center },
-    },
-    imported_layers: data.imported_layers?.length ? data.imported_layers : (
-      data.imported_features?.features?.length ? [{
-        id: uuid(),
-        name: "Legacy import",
-        visible: true,
-        locked: true,
-        data: data.imported_features,
-      }] : []
-    ),
+    geometry: { type: "Point", coordinates },
   };
 }
 
-function renderExportCrop(sourceCanvas, outputWidth, outputHeight) {
-  const output = document.createElement("canvas");
-  output.width = outputWidth;
-  output.height = outputHeight;
-  const context = output.getContext("2d");
-  context.fillStyle = project.palette.background;
-  context.fillRect(0, 0, outputWidth, outputHeight);
+function loadFeatures(features) {
+  state.pois = features
+    .filter((feature) => feature.geometry?.type === "Point")
+    .map((feature, index) => pointFeature(
+      feature.geometry.coordinates.slice(0, 2),
+      feature.properties?.label || feature.properties?.name || `POI ${index + 1}`,
+    ));
 
-  const frame = el("map-frame");
-  const sourceScale = sourceCanvas.width / frame.clientWidth;
-  const boundary = project.export_boundary.enabled
-    ? boundaryScreenState()
-    : {
-        x: frame.clientWidth / 2,
-        y: frame.clientHeight / 2,
-        width: frame.clientWidth,
-        height: frame.clientHeight,
-        rotation: 0,
-      };
-  const sourceWidth = boundary.width * sourceScale;
-  const sourceHeight = boundary.height * sourceScale;
-  // Uniform scaling preserves map geometry. Any unlocked aspect mismatch is
-  // letterboxed rather than squeezing the selected geographic area.
-  const scale = Math.min(outputWidth / sourceWidth, outputHeight / sourceHeight);
-  context.save();
-  context.translate(outputWidth / 2, outputHeight / 2);
-  context.scale(scale, scale);
-  context.rotate(-boundary.rotation * Math.PI / 180);
-  context.drawImage(
-    sourceCanvas,
-    -boundary.x * sourceScale,
-    -boundary.y * sourceScale
-  );
-  context.restore();
-  return output;
+  const line = features.find((feature) => feature.geometry?.type === "LineString");
+  state.route = line ? line.geometry.coordinates.map((coordinate) => coordinate.slice(0, 2)) : [];
+  state.selectedPoi = state.pois.length ? 0 : null;
+  setMode("view");
+  renderAll();
+  fitContent();
 }
 
-async function exportProject(format) {
-  clearRouteEditHandles();
-  draw.deleteAll();
-  const data = serializeProject();
-  const filename = safeFilename(project.name);
-  if (format === "png" || format === "pdf") {
-    setStatus(`Rendering ${format.toUpperCase()}...`);
-    try {
-      if (!map.loaded() || !map.areTilesLoaded()) {
-        await new Promise((resolve) => map.once("idle", resolve));
-      }
-      const boundaryNode = el("export-boundary");
-      const boundaryVisibility = boundaryNode.style.visibility;
-      boundaryNode.style.visibility = "hidden";
-      const canvas = await html2canvas(el("map-frame"), {
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: project.palette.background,
-        scale: Math.min(3, Math.max(1.5, data.export.width / el("map-frame").clientWidth)),
-      });
-      boundaryNode.style.visibility = boundaryVisibility;
-      const output = renderExportCrop(canvas, data.export.width, data.export.height);
-      if (format === "png") {
-        output.toBlob((blob) => downloadBlob(blob, `${filename}.png`), "image/png");
-      } else {
-        const orientation = data.export.width >= data.export.height ? "landscape" : "portrait";
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF({
-          orientation,
-          unit: "px",
-          format: [data.export.width, data.export.height],
-          hotfixes: ["px_scaling"],
-        });
-        pdf.addImage(output.toDataURL("image/jpeg", 0.94), "JPEG", 0, 0, data.export.width, data.export.height);
-        pdf.save(`${filename}.pdf`);
-      }
-    } catch (error) {
-      el("export-boundary").style.visibility = "";
-      showToast(`${format.toUpperCase()} export failed: ${error.message}`);
-    } finally {
-      setStatus("Ready");
-    }
-    return;
+function setMode(mode) {
+  state.mode = mode;
+  state.dragIndex = null;
+  elements.drawRoute.textContent = mode === "draw" ? "Finish path" : "Draw path";
+  elements.editRoute.textContent = mode === "edit" ? "Done editing" : "Edit path";
+  elements.addPoi.textContent = mode === "add-poi" ? "Cancel adding POI" : "Add POI on map";
+  elements.mapTip.textContent = mode === "add-poi"
+    ? "Click the map to place the new POI"
+    : "Choose Add POI, then click the map";
+  map.getCanvas().style.cursor = ["draw", "add-poi"].includes(mode) ? "crosshair" : "";
+  renderRoute();
+}
+
+function finishDrawing() {
+  if (state.route.length < 2) {
+    state.route = [];
+    setMessage("A path needs at least two points", true);
+  } else {
+    setMessage("Walking path created");
   }
-  const response = await fetch(apiUrl(`/api/export/${format}`), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) return showToast((await response.json()).detail || "Export failed");
-  downloadBlob(await response.blob(), `${filename}.${format}`);
-}
-
-function syncUiFromProject() {
-  el("project-name").value = project.name;
-  el("detail-level").value = project.detail_level;
-  el("poi-marker-mode").value = project.poi_marker_mode;
-  el("poi-simple-markers").checked = project.poi_simple_markers;
-  el("route-mode").value = project.route_mode;
-  el("show-arrows").checked = project.show_arrows;
-  el("zoom-number").value = Number(project.zoom).toFixed(1);
-  el("zoom-slider").value = project.zoom;
-  el("rotation-slider").value = project.rotation;
-  el("rotation-output").value = `${Math.round(project.rotation)}°`;
-  el("compass-visible").checked = project.compass.visible;
-  el("compass-position").value = project.compass.position;
-  el("compass-size").value = project.compass.size;
-  el("compass-color").value = project.compass.color;
-  el("compass-locked").checked = project.compass.locked;
-  el("compass-snap").checked = project.compass.snap;
-  el("legend-visible").checked = project.legend.visible;
-  el("legend-locked").checked = project.legend.locked;
-  el("legend-snap").checked = project.legend.snap;
-  el("export-preset").value = project.export.preset;
-  el("export-width").value = project.export.width;
-  el("export-height").value = project.export.height;
-  el("boundary-enabled").checked = project.export_boundary.enabled;
-  el("boundary-visible").checked = project.export_boundary.visible;
-  el("boundary-lock-aspect").checked = project.export_boundary.lock_aspect;
-  renderPaletteControls();
-  renderLegendControls();
-  renderWorkflow();
-  updateRouteHistoryControls();
+  setMode("view");
 }
 
 function renderAll() {
   renderPois();
   renderRoute();
-  renderParking();
-  renderImportedFeatures();
-  applyPalette();
-  applyDetailLevel(project.detail_level);
-  setRotation(project.rotation, project.orientation_mode, false);
-  renderCompass();
-  renderLegend();
-  renderExportBoundary(false);
 }
 
-function bindEvents() {
-  el("location-form").addEventListener("submit", (event) => {
-    event.preventDefault();
-    geocodeLocation(el("location-input").value);
+function renderPois() {
+  const visiblePois = state.pois
+    .map((poi, index) => ({
+      ...poi,
+      properties: {
+        ...poi.properties,
+        index,
+        number: String(index + 1),
+        selected: state.selectedPoi === index,
+      },
+    }))
+    .filter((poi) => poi.properties.visible !== false);
+  const source = map.getSource("pois");
+  if (source) source.setData({ type: "FeatureCollection", features: visiblePois });
+  elements.poiCount.textContent = state.pois.length;
+  renderPoiOverlay();
+  renderPoiList();
+}
+
+function renderPoiOverlay() {
+  elements.poiOverlay.replaceChildren();
+  state.pois.forEach((poi, index) => {
+    if (poi.properties.visible === false) return;
+    const item = document.createElement("div");
+    item.className = `poi-overlay-item${state.selectedPoi === index ? " selected" : ""}`;
+    item.dataset.index = index;
+
+    const pin = document.createElement("button");
+    pin.type = "button";
+    pin.className = "poi-overlay-pin";
+    pin.setAttribute("aria-label", `Edit ${poi.properties.label}`);
+    pin.innerHTML = `
+      <svg viewBox="0 0 34 44" aria-hidden="true">
+        <path class="pin-ring" d="M17 0C7.6 0 0 7.6 0 17c0 12.5 17 27 17 27s17-14.5 17-27C34 7.6 26.4 0 17 0z"/>
+        <path class="pin-fill" d="M17 4C9.8 4 4 9.8 4 17c0 8.8 9.5 19.2 13 22.7 3.5-3.5 13-13.9 13-22.7C30 9.8 24.2 4 17 4z"/>
+        <circle class="pin-ring" cx="17" cy="17" r="8"/>
+        <text class="pin-number" x="17" y="21">${index + 1}</text>
+      </svg>`;
+    pin.addEventListener("click", (event) => {
+      event.stopPropagation();
+      selectPoi(index);
+    });
+    pin.addEventListener("mousedown", (event) => startPoiDrag(event, index));
+
+    const label = document.createElement("span");
+    label.className = "poi-overlay-label";
+    label.textContent = poi.properties.label;
+    label.hidden = state.hidePoiLabels;
+    item.append(pin, label);
+    elements.poiOverlay.append(item);
   });
-  el("geocode-results").addEventListener("click", (event) => {
-    const button = event.target.closest("button");
-    if (!button) return;
-    map.flyTo({ center: [Number(button.dataset.lng), Number(button.dataset.lat)], zoom: 16 });
-    el("geocode-results").innerHTML = "";
+  positionPoiOverlay();
+}
+
+function positionPoiOverlay() {
+  elements.poiOverlay.querySelectorAll(".poi-overlay-item").forEach((item) => {
+    const index = Number(item.dataset.index);
+    const point = map.project(state.pois[index].geometry.coordinates);
+    item.style.left = `${point.x}px`;
+    item.style.top = `${point.y}px`;
   });
-  el("data-upload").addEventListener("change", (event) => {
-    pendingImportFile = event.target.files[0] || null;
-    if (pendingImportFile) el("import-options-dialog").showModal();
+}
+
+function updateOverlays() {
+  updateRouteOverlay();
+  positionPoiOverlay();
+}
+
+function startPoiDrag(event, index) {
+  if (["draw", "add-poi"].includes(state.mode)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  state.draggedPoi = index;
+  state.selectedPoi = index;
+  map.dragPan.disable();
+  event.currentTarget.style.cursor = "grabbing";
+  window.addEventListener("mousemove", movePoiDrag);
+  window.addEventListener("mouseup", endPoiDrag, { once: true });
+}
+
+function movePoiDrag(event) {
+  if (state.draggedPoi === null) return;
+  const mapRect = map.getContainer().getBoundingClientRect();
+  const coordinates = map.unproject([
+    event.clientX - mapRect.left,
+    event.clientY - mapRect.top,
+  ]);
+  state.pois[state.draggedPoi].geometry.coordinates = [coordinates.lng, coordinates.lat];
+  updatePoiMapData();
+  positionPoiOverlay();
+}
+
+function endPoiDrag(event) {
+  const index = state.draggedPoi;
+  window.removeEventListener("mousemove", movePoiDrag);
+  state.draggedPoi = null;
+  map.dragPan.enable();
+  if (index === null) return;
+  renderPois();
+  setMessage(`${state.pois[index].properties.label} moved`);
+}
+
+function addPoiAt(coordinates) {
+  const index = state.pois.length;
+  const label = `POI ${index + 1}`;
+  state.pois.push(pointFeature(coordinates, label));
+  state.selectedPoi = index;
+  renderPois();
+  setMessage(`${label} added. Click the map to add another POI.`);
+}
+
+function renderPoiList() {
+  elements.poiList.replaceChildren();
+  if (!state.pois.length) {
+    const empty = document.createElement("div");
+    empty.className = "poi-empty";
+    empty.textContent = "No POIs yet. Import points or add one on the map.";
+    elements.poiList.append(empty);
+    return;
+  }
+
+  state.pois.forEach((poi, index) => {
+    const card = document.createElement("article");
+    card.className = `poi-card${state.selectedPoi === index ? " selected" : ""}`;
+    card.dataset.index = index;
+
+    const name = document.createElement("input");
+    name.className = "poi-name";
+    name.value = poi.properties.label;
+    name.setAttribute("aria-label", `POI ${index + 1} name`);
+    name.addEventListener("focus", () => {
+      selectPoi(index, false, false);
+      name.dataset.replaceOnType = "true";
+      name.select();
+    });
+    name.addEventListener("click", () => {
+      name.dataset.replaceOnType = "true";
+      name.select();
+    });
+    name.addEventListener("beforeinput", (event) => {
+      if (
+        name.dataset.replaceOnType === "true"
+        && event.inputType.startsWith("insert")
+      ) {
+        name.value = "";
+        name.dataset.replaceOnType = "false";
+      }
+    });
+    name.addEventListener("input", () => {
+      name.dataset.replaceOnType = "false";
+      poi.properties.label = name.value || `POI ${index + 1}`;
+      updatePoiMapData();
+      const overlayLabel = elements.poiOverlay.querySelector(
+        `.poi-overlay-item[data-index="${index}"] .poi-overlay-label`,
+      );
+      if (overlayLabel) overlayLabel.textContent = poi.properties.label;
+    });
+
+    const coordinates = document.createElement("div");
+    coordinates.className = "coordinate-row";
+    const lng = coordinateInput("Longitude", poi.geometry.coordinates[0], (value) => {
+      poi.geometry.coordinates[0] = value;
+      renderPois();
+    });
+    const lat = coordinateInput("Latitude", poi.geometry.coordinates[1], (value) => {
+      poi.geometry.coordinates[1] = value;
+      renderPois();
+    });
+    coordinates.append(lng, lat);
+
+    const actions = document.createElement("div");
+    actions.className = "poi-actions";
+    const visibility = document.createElement("label");
+    visibility.className = "poi-visibility";
+    const visibilityInput = document.createElement("input");
+    visibilityInput.type = "checkbox";
+    visibilityInput.checked = poi.properties.visible !== false;
+    visibilityInput.setAttribute("aria-label", `Show ${poi.properties.label} on map`);
+    const visibilityText = document.createElement("span");
+    visibilityText.textContent = "Show on map";
+    visibilityInput.addEventListener("change", () => {
+      poi.properties.visible = visibilityInput.checked;
+      state.selectedPoi = index;
+      renderPois();
+      setMessage(
+        visibilityInput.checked
+          ? `${poi.properties.label} shown on map`
+          : `${poi.properties.label} hidden from map`,
+      );
+    });
+    visibility.append(visibilityInput, visibilityText);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "delete-poi";
+    remove.textContent = "Delete";
+    remove.addEventListener("click", () => deletePoi(index));
+    actions.append(visibility, remove);
+    card.append(name, coordinates, actions);
+    elements.poiList.append(card);
   });
-  el("confirm-import").addEventListener("click", () => {
-    const mode = document.querySelector('input[name="import-mode"]:checked').value;
-    if (pendingImportFile) uploadMapData(pendingImportFile, mode);
-    pendingImportFile = null;
-    el("data-upload").value = "";
+}
+
+function coordinateInput(label, value, onChange) {
+  const input = document.createElement("input");
+  input.type = "number";
+  input.step = "0.000001";
+  input.value = Number(value).toFixed(6);
+  input.setAttribute("aria-label", label);
+  input.addEventListener("change", () => {
+    const next = Number(input.value);
+    if (Number.isFinite(next)) onChange(next);
   });
-  el("zoom-in").addEventListener("click", () => setMapZoom(map.getZoom() + 1));
-  el("zoom-out").addEventListener("click", () => setMapZoom(map.getZoom() - 1));
-  el("zoom-number").addEventListener("change", (event) => setMapZoom(event.target.value));
-  el("zoom-slider").addEventListener("input", (event) => setMapZoom(event.target.value));
-  el("add-poi").addEventListener("click", () => {
-    const center = map.getCenter();
-    addPoi({ lat: center.lat, lng: center.lng });
-  });
-  el("poi-marker-mode").addEventListener("change", (event) => {
-    project.poi_marker_mode = event.target.value;
+  return input;
+}
+
+function updatePoiMapData() {
+  const source = map.getSource("pois");
+  if (source) {
+    source.setData({
+      type: "FeatureCollection",
+      features: state.pois
+        .map((poi, index) => ({
+          ...poi,
+          properties: {
+            ...poi.properties,
+            index,
+            number: String(index + 1),
+            selected: state.selectedPoi === index,
+          },
+        }))
+        .filter((poi) => poi.properties.visible !== false),
+    });
+  }
+}
+
+function selectPoi(index, moveMap = false, rebuildList = true) {
+  state.selectedPoi = index;
+  if (rebuildList) {
     renderPois();
+  } else {
+    elements.poiList.querySelectorAll(".poi-card").forEach((card) => {
+      card.classList.toggle("selected", Number(card.dataset.index) === index);
+    });
+    renderPoiOverlay();
+  }
+  if (moveMap) {
+    map.easeTo({ center: state.pois[index].geometry.coordinates, zoom: Math.max(map.getZoom(), 16) });
+  }
+  setMessage(`Editing ${state.pois[index].properties.label}`);
+}
+
+function deletePoi(index) {
+  const label = state.pois[index].properties.label;
+  state.pois.splice(index, 1);
+  state.selectedPoi = state.pois.length ? Math.min(index, state.pois.length - 1) : null;
+  renderPois();
+  setMessage(`${label} deleted`);
+}
+
+function renderRoute() {
+  const routeSource = map.getSource("route");
+  const vertexSource = map.getSource("route-vertices");
+  const routeFeatures = state.route.length >= 2
+    ? [{
+      type: "Feature",
+      properties: {},
+      geometry: { type: "LineString", coordinates: state.route },
+    }]
+    : [];
+  const vertices = state.mode === "edit"
+    ? state.route.map((coordinates, index) => ({
+      type: "Feature",
+      properties: { index },
+      geometry: { type: "Point", coordinates },
+    }))
+    : [];
+
+  if (routeSource) routeSource.setData({ type: "FeatureCollection", features: routeFeatures });
+  if (vertexSource) vertexSource.setData({ type: "FeatureCollection", features: vertices });
+  elements.routeCount.textContent = state.route.length;
+  updateRouteOverlay();
+  renderRouteMarkers();
+}
+
+function updateRouteOverlay() {
+  const path = state.route
+    .map((coordinates, index) => {
+      const point = map.project(coordinates);
+      return `${index ? "L" : "M"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+    })
+    .join(" ");
+  elements.routeOverlayOutline.setAttribute("d", state.route.length >= 2 ? path : "");
+  elements.routeOverlayLine.setAttribute("d", state.route.length >= 2 ? path : "");
+}
+
+function renderRouteMarkers() {
+  state.routeMarkers.forEach((marker) => marker.remove());
+  state.routeMarkers = [];
+  if (!map.loaded() || state.mode !== "edit") return;
+
+  state.route.forEach((coordinates, index) => {
+    const handle = document.createElement("button");
+    handle.type = "button";
+    handle.className = "route-map-handle";
+    handle.setAttribute("aria-label", `Move path point ${index + 1}`);
+    const marker = new maplibregl.Marker({
+      element: handle,
+      draggable: true,
+      anchor: "center",
+    })
+      .setLngLat(coordinates)
+      .addTo(map);
+    marker.on("drag", () => {
+      const position = marker.getLngLat();
+      state.route[index] = [position.lng, position.lat];
+      updateRouteOverlay();
+    });
+    marker.on("dragend", () => {
+      renderRoute();
+      setMessage(`Path point ${index + 1} moved`);
+    });
+    state.routeMarkers.push(marker);
   });
-  el("poi-simple-markers").addEventListener("change", (event) => {
-    project.poi_simple_markers = event.target.checked;
-    renderPois();
+}
+
+function visiblePoiCoordinates() {
+  return state.pois
+    .filter((feature) => feature.properties.visible !== false)
+    .map((feature) => feature.geometry.coordinates);
+}
+
+function fitContent(options = {}) {
+  const coordinates = visiblePoiCoordinates();
+  if (!coordinates.length) return setMessage("Show or add a POI to fit", true);
+  const padding = exportFramePadding();
+  if (coordinates.length === 1) {
+    map.easeTo({
+      center: coordinates[0],
+      zoom: 16,
+      bearing: map.getBearing(),
+      pitch: 0,
+      padding,
+      duration: 650,
+    });
+    setMessage(options.message || "Content fitted to the map");
+    return;
+  }
+  const camera = bestFrameCamera(coordinates);
+  map.easeTo({
+    center: camera.center,
+    zoom: camera.zoom,
+    padding,
+    bearing: camera.bearing,
+    pitch: 0,
+    duration: 650,
   });
-  el("collapse-all-pois").addEventListener("click", () => {
-    expandedPoiIds.clear();
-    renderPoiList();
+  setMessage(options.message || "Content fitted to the map");
+}
+
+function bestFrameCamera(coordinates) {
+  const frameRect = elements.cropFrame.getBoundingClientRect();
+  const availableWidth = Math.max(
+    80,
+    frameRect.width - FRAME_INSET.left - FRAME_INSET.right,
+  );
+  const availableHeight = Math.max(
+    80,
+    frameRect.height - FRAME_INSET.top - FRAME_INSET.bottom,
+  );
+  const points = coordinates.map((coordinate) => {
+    const mercator = maplibregl.MercatorCoordinate.fromLngLat(coordinate);
+    return { x: mercator.x, y: mercator.y };
   });
-  el("expand-all-pois").addEventListener("click", () => {
-    project.pois.forEach((poi) => expandedPoiIds.add(poi.id));
-    renderPoiList();
-  });
-  el("show-poi-labels").addEventListener("click", () => {
-    project.pois.forEach((poi) => { poi.show_label = true; });
-    renderPois();
-  });
-  el("hide-poi-labels").addEventListener("click", () => {
-    project.pois.forEach((poi) => { poi.show_label = false; });
-    renderPois();
-  });
-  el("build-route").addEventListener("click", () => {
-    project.route_mode = el("route-mode").value;
-    buildRoute();
-  });
-  el("route-mode").addEventListener("change", (event) => { project.route_mode = event.target.value; });
-  el("edit-route").addEventListener("click", () => toggleRouteEditMode());
-  el("clear-edit-handles").addEventListener("click", () => clearRouteEditHandles());
-  document.addEventListener("keydown", (event) => {
-    if (!routeEditMode || selectedRouteVertex === null || !["Delete", "Backspace"].includes(event.key)) return;
-    if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
-    event.preventDefault();
-    deleteRouteVertex(selectedRouteVertex);
-  });
-  el("reverse-route").addEventListener("click", () => {
-    recordRouteState();
-    project.route.reverse();
-    project.pois.reverse();
-    renderPois();
-    renderRoute();
-  });
-  el("clear-route").addEventListener("click", () => {
-    recordRouteState();
-    project.route = [];
-    clearRouteEditHandles();
-    renderRoute();
-  });
-  el("undo-route").addEventListener("click", undoRoute);
-  el("redo-route").addEventListener("click", redoRoute);
-  el("revert-route").addEventListener("click", () => {
-    recordRouteState();
-    restoreRoute(lastSavedRoute);
-  });
-  el("reset-route").addEventListener("click", () => {
-    recordRouteState();
-    project.route_mode = "straight";
-    el("route-mode").value = "straight";
-    project.route = project.pois.filter((poi) => poi.selected).map((poi) => ({ ...poi.position }));
-    clearRouteEditHandles();
-    renderRoute();
-  });
-  el("show-arrows").addEventListener("change", (event) => {
-    project.show_arrows = event.target.checked;
-    renderRoute();
-  });
-  el("draw-parking").addEventListener("click", () => {
-    drawPurpose = "parking";
-    activeParkingEditId = null;
-    draw.changeMode("draw_polygon");
-    setStatus("Click map to draw parking; click the first point to finish");
-  });
-  el("detail-level").addEventListener("change", (event) => applyDetailLevel(event.target.value));
-  el("palette-controls").addEventListener("input", (event) => {
-    if (!event.target.dataset.palette) return;
-    project.palette[event.target.dataset.palette] = event.target.value;
-    applyPalette();
-  });
-  el("austin-palette").addEventListener("click", () => {
-    project.palette = { ...AUSTIN_PALETTE };
-    renderPaletteControls();
-    applyPalette();
-  });
-  document.querySelectorAll("[data-orientation]").forEach((button) => button.addEventListener("click", () => {
-    if (button.dataset.orientation === "north") setRotation(0, "north");
-    if (button.dataset.orientation === "route") fitRoute(true);
-    if (button.dataset.orientation === "custom") setRotation(el("rotation-slider").value, "custom");
-  }));
-  el("rotation-slider").addEventListener("input", (event) => setRotation(event.target.value, "custom", false));
-  el("fit-route").addEventListener("click", () => fitRoute(true));
-  el("reset-rotation").addEventListener("click", () => setRotation(0, "north"));
-  el("compass-visible").addEventListener("change", (event) => { project.compass.visible = event.target.checked; renderCompass(); });
-  el("compass-position").addEventListener("change", (event) => {
-    project.compass.position = event.target.value;
-    project.compass.custom_position = {};
-    renderCompass();
-  });
-  el("compass-size").addEventListener("input", (event) => { project.compass.size = Number(event.target.value); renderCompass(); });
-  el("compass-color").addEventListener("input", (event) => { project.compass.color = event.target.value; renderCompass(); });
-  el("compass-locked").addEventListener("change", (event) => { project.compass.locked = event.target.checked; renderCompass(); });
-  el("compass-snap").addEventListener("change", (event) => { project.compass.snap = event.target.checked; });
-  el("legend-visible").addEventListener("change", (event) => { project.legend.visible = event.target.checked; renderLegend(); });
-  el("legend-locked").addEventListener("change", (event) => { project.legend.locked = event.target.checked; renderLegend(); });
-  el("legend-snap").addEventListener("change", (event) => { project.legend.snap = event.target.checked; });
-  el("legend-toggles").addEventListener("change", (event) => {
-    project.legend.items[event.target.dataset.legendItem] = event.target.checked;
-    renderLegend();
-  });
-  el("export-preset").addEventListener("change", (event) => {
-    const preset = exportPresets[event.target.value];
-    if (preset) applyExportDimensions(preset.width, preset.height, event.target.value);
-  });
-  ["export-width", "export-height"].forEach((id) => el(id).addEventListener("input", () => {
-    const width = Number(el("export-width").value);
-    const height = Number(el("export-height").value);
-    if (width >= 320 && height >= 320) applyExportDimensions(width, height, "custom");
-  }));
-  el("boundary-enabled").addEventListener("change", (event) => {
-    project.export_boundary.enabled = event.target.checked;
-  });
-  el("boundary-visible").addEventListener("change", (event) => {
-    project.export_boundary.visible = event.target.checked;
-    renderExportBoundary(false);
-  });
-  el("boundary-lock-aspect").addEventListener("change", (event) => {
-    project.export_boundary.lock_aspect = event.target.checked;
-    if (event.target.checked) {
-      project.export_boundary.aspect_ratio = outputAspectRatio();
-      project.export_boundary.height = project.export_boundary.width / project.export_boundary.aspect_ratio;
+  let best = null;
+
+  for (let bearing = 0; bearing < 180; bearing += 3) {
+    const radians = bearing * Math.PI / 180;
+    const cosine = Math.cos(radians);
+    const sine = Math.sin(radians);
+    const rotated = points.map((point) => ({
+      x: point.x * cosine + point.y * sine,
+      y: -point.x * sine + point.y * cosine,
+    }));
+    const xs = rotated.map((point) => point.x);
+    const ys = rotated.map((point) => point.y);
+    const width = Math.max(...xs) - Math.min(...xs);
+    const height = Math.max(...ys) - Math.min(...ys);
+    const zoomX = width ? Math.log2(availableWidth / (width * 512)) : 24;
+    const zoomY = height ? Math.log2(availableHeight / (height * 512)) : 24;
+    const zoom = Math.min(16, zoomX, zoomY);
+    if (!best || zoom > best.zoom) {
+      const rotatedCenter = {
+        x: (Math.min(...xs) + Math.max(...xs)) / 2,
+        y: (Math.min(...ys) + Math.max(...ys)) / 2,
+      };
+      best = {
+        bearing,
+        zoom,
+        centerPoint: {
+          x: rotatedCenter.x * cosine - rotatedCenter.y * sine,
+          y: rotatedCenter.x * sine + rotatedCenter.y * cosine,
+        },
+      };
     }
-    renderExportBoundary(false);
-  });
-  el("fit-boundary-route").addEventListener("click", fitBoundaryToRoute);
-  el("center-boundary-route").addEventListener("click", centerBoundaryOnRoute);
-  document.querySelectorAll("[data-export]").forEach((button) => button.addEventListener("click", () => exportProject(button.dataset.export)));
-  el("save-project").addEventListener("click", saveProject);
-  el("load-project").addEventListener("change", (event) => event.target.files[0] && loadProjectFile(event.target.files[0]));
-  el("previous-stage").addEventListener("click", () => setWorkflowStage(project.workflow_stage - 1));
-  el("next-stage").addEventListener("click", () => setWorkflowStage(project.workflow_stage + 1));
-  el("quick-edit-mode").addEventListener("change", (event) => {
-    project.quick_edit_mode = event.target.checked;
-    renderWorkflow();
-  });
-  el("workflow-steps").addEventListener("click", (event) => {
-    const button = event.target.closest("[data-workflow-stage]");
-    if (button && !button.disabled) setWorkflowStage(button.dataset.workflowStage);
-  });
-  bindPoiList();
-  bindParkingList();
-  bindImportLayers();
+  }
+
+  const center = new maplibregl.MercatorCoordinate(
+    best.centerPoint.x,
+    best.centerPoint.y,
+    0,
+  ).toLngLat();
+  return { center, zoom: best.zoom, bearing: best.bearing };
 }
 
-function start() {
-  syncUiFromProject();
-  initMap();
-  bindEvents();
-  makeLegendDraggable();
-  makeCompassDraggable();
-  renderWorkflow();
-  bindExportBoundary();
+function exportFramePadding() {
+  const mapRect = map.getContainer().getBoundingClientRect();
+  const frameRect = elements.cropFrame.getBoundingClientRect();
+  return {
+    top: Math.max(0, frameRect.top - mapRect.top + FRAME_INSET.top),
+    right: Math.max(0, mapRect.right - frameRect.right + FRAME_INSET.right),
+    bottom: Math.max(0, mapRect.bottom - frameRect.bottom + FRAME_INSET.bottom),
+    left: Math.max(0, frameRect.left - mapRect.left + FRAME_INSET.left),
+  };
 }
 
-start();
+function updateFrameShape() {
+  const ratio = Number(elements.frameShape.value);
+  const workspace = document.querySelector(".map-workspace");
+  const maxWidth = workspace.clientWidth * 0.68;
+  const maxHeight = workspace.clientHeight * 0.72;
+  let width = Math.min(620, maxWidth);
+  let height = width / ratio;
+  if (height > maxHeight) {
+    height = maxHeight;
+    width = height * ratio;
+  }
+  elements.cropFrame.style.width = `${Math.max(180, width)}px`;
+  elements.cropFrame.style.height = `${Math.max(180, height)}px`;
+  elements.cropFrame.style.aspectRatio = "auto";
+}
 
-// A small read-only inspection hook helps automated checks verify canvas-only
-// MapLibre state without coupling tests to private library internals.
-window.plainmapStudio = {
-  inspect: () => ({
-    bearing: map?.getBearing() ?? 0,
-    zoom: map?.getZoom() ?? project.zoom,
-    detailLevel: project.detail_level,
-    markerMode: project.poi_marker_mode,
-    route: structuredClone(project.route),
-    boundary: structuredClone(project.export_boundary),
-    hiddenBaseLayers: styleReady
-      ? [...baseLayerVisibility.keys()].filter((id) => map.getLayoutProperty(id, "visibility") === "none").length
-      : 0,
-    visibleBaseLayers: styleReady
-      ? [...baseLayerVisibility.keys()].filter((id) => map.getLayoutProperty(id, "visibility") !== "none").length
-      : 0,
-  }),
-};
+async function exportPng() {
+  setMode("view");
+  setMessage("Preparing PNG");
+  await waitForMap();
+
+  try {
+    const sourceCanvas = map.getCanvas();
+    const mapRect = sourceCanvas.getBoundingClientRect();
+    const frameRect = elements.cropFrame.getBoundingClientRect();
+    const scaleX = sourceCanvas.width / mapRect.width;
+    const scaleY = sourceCanvas.height / mapRect.height;
+    const sx = Math.max(0, (frameRect.left - mapRect.left) * scaleX);
+    const sy = Math.max(0, (frameRect.top - mapRect.top) * scaleY);
+    const sw = Math.min(sourceCanvas.width - sx, frameRect.width * scaleX);
+    const sh = Math.min(sourceCanvas.height - sy, frameRect.height * scaleY);
+    const output = document.createElement("canvas");
+    output.width = Math.round(sw);
+    output.height = Math.round(sh);
+    const context = output.getContext("2d");
+    context.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, output.width, output.height);
+    drawExportFeatures(context, mapRect, frameRect, scaleX, scaleY);
+
+    const blob = await new Promise((resolve) => output.toBlob(resolve, "image/png"));
+    if (!blob) throw new Error("The map image could not be created.");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "plainmap.png";
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setMessage("PNG exported");
+  } catch (error) {
+    setMessage("Export failed. Check that map tiles finished loading.", true);
+  }
+}
+
+function drawExportFeatures(context, mapRect, frameRect, scaleX, scaleY) {
+  const exportPoint = (coordinates) => {
+    const point = map.project(coordinates);
+    return {
+      x: (point.x - (frameRect.left - mapRect.left)) * scaleX,
+      y: (point.y - (frameRect.top - mapRect.top)) * scaleY,
+    };
+  };
+
+  if (state.route.length >= 2) {
+    const points = state.route.map(exportPoint);
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.beginPath();
+    points.forEach((point, index) => {
+      if (index) context.lineTo(point.x, point.y);
+      else context.moveTo(point.x, point.y);
+    });
+    context.strokeStyle = "#ffffff";
+    context.lineWidth = 13 * scaleX;
+    context.stroke();
+    context.strokeStyle = state.colors.route;
+    context.lineWidth = 8 * scaleX;
+    context.stroke();
+  }
+
+  state.pois
+    .map((poi, index) => ({ poi, index }))
+    .filter(({ poi }) => poi.properties.visible !== false)
+    .forEach(({ poi, index }) => {
+      drawExportPin(
+        context,
+        exportPoint(poi.geometry.coordinates),
+        index + 1,
+        poi.properties.label || `POI ${index + 1}`,
+        (scaleX + scaleY) / 2,
+      );
+    });
+}
+
+function drawExportPin(context, point, number, label, scale) {
+  const width = 34 * scale;
+  const height = 44 * scale;
+  const left = point.x - width / 2;
+  const top = point.y - height;
+
+  context.save();
+  context.translate(left, top);
+  context.scale(scale, scale);
+
+  context.beginPath();
+  context.moveTo(17, 44);
+  context.bezierCurveTo(13, 39, 0, 28, 0, 17);
+  context.arc(17, 17, 17, Math.PI, 0);
+  context.bezierCurveTo(34, 28, 21, 39, 17, 44);
+  context.closePath();
+  context.fillStyle = "#ffffff";
+  context.fill();
+
+  context.beginPath();
+  context.moveTo(17, 39.5);
+  context.bezierCurveTo(13.5, 35.5, 4, 26, 4, 17);
+  context.arc(17, 17, 13, Math.PI, 0);
+  context.bezierCurveTo(30, 26, 20.5, 35.5, 17, 39.5);
+  context.closePath();
+  context.fillStyle = state.colors.poi;
+  context.fill();
+
+  context.beginPath();
+  context.arc(17, 17, 8, 0, Math.PI * 2);
+  context.fillStyle = "#ffffff";
+  context.fill();
+  context.fillStyle = state.colors.poi;
+  context.font = "900 11px sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(String(number), 17, 17.5);
+  context.restore();
+
+  if (state.hidePoiLabels) return;
+  const fontSize = 11 * scale;
+  const paddingX = 7 * scale;
+  const labelHeight = 24 * scale;
+  const labelX = point.x + 23 * scale;
+  const labelY = point.y - 39 * scale;
+  context.save();
+  context.font = `800 ${fontSize}px sans-serif`;
+  const labelWidth = context.measureText(label).width + paddingX * 2;
+  roundedRect(context, labelX, labelY, labelWidth, labelHeight, 6 * scale);
+  context.fillStyle = "rgba(20, 33, 61, 0.96)";
+  context.fill();
+  context.lineWidth = 2 * scale;
+  context.strokeStyle = "#ffffff";
+  context.stroke();
+  context.fillStyle = "#ffffff";
+  context.textAlign = "left";
+  context.textBaseline = "middle";
+  context.fillText(label, labelX + paddingX, labelY + labelHeight / 2);
+  context.restore();
+}
+
+function roundedRect(context, x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2);
+  context.beginPath();
+  context.moveTo(x + r, y);
+  context.arcTo(x + width, y, x + width, y + height, r);
+  context.arcTo(x + width, y + height, x, y + height, r);
+  context.arcTo(x, y + height, x, y, r);
+  context.arcTo(x, y, x + width, y, r);
+  context.closePath();
+}
+
+function waitForMap() {
+  if (map.loaded() && map.areTilesLoaded()) return Promise.resolve();
+  return new Promise((resolve) => {
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      resolve();
+    };
+    map.once("idle", finish);
+    window.setTimeout(finish, 1500);
+  });
+}
+
+function setMessage(message, isError = false) {
+  elements.message.textContent = message;
+  elements.message.style.color = isError ? "#b9382b" : "";
+}
+
+updateFrameShape();
