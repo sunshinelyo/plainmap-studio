@@ -123,6 +123,28 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px s
 .button-row { display: flex; gap: 8px; }
 .button-row button { flex: 1; }
 .full-button { width: 100%; margin-top: 14px; }
+.export-options {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: end;
+  gap: 12px;
+  margin: 12px 0;
+}
+.export-toggle {
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.export-toggle input {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: var(--ink);
+}
 .global-label-toggle {
   display: flex;
   grid-template-columns: none;

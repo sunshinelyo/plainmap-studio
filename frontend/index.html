@@ -6,7 +6,7 @@
   <title>PlainMap Studio</title>
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="/assets/styles.css?v=13">
+  <link rel="stylesheet" href="/assets/styles.css?v=14">
 </head>
 <body>
   <main class="app-shell">
@@ -87,6 +87,19 @@
             <option value="1.5">Landscape 3:2</option>
           </select>
         </label>
+        <div class="export-options">
+          <label class="export-toggle">
+            <input id="export-compass" type="checkbox">
+            <span>Add compass</span>
+          </label>
+          <label>Legend
+            <select id="export-legend">
+              <option value="none">None</option>
+              <option value="inside">Inside map</option>
+              <option value="separate">Separate PNG</option>
+            </select>
+          </label>
+        </div>
         <div class="button-row">
           <button id="fit-content" class="secondary" type="button">Fit content</button>
           <button id="export-png" type="button">Export PNG</button>
@@ -112,6 +125,6 @@
   </main>
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <script src="/assets/app.js?v=21"></script>
+  <script src="/assets/app.js?v=22"></script>
 </body>
 </html>

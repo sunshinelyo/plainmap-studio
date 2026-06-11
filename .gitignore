@@ -19,3 +19,6 @@ Thumbs.db
 
 exports/*
 !exports/.gitkeep
+
+graphify-out/cache/
+graphify-out/cost.json

@@ -30,6 +30,8 @@ const elements = {
   routeColor: document.querySelector("#route-color"),
   poiColor: document.querySelector("#poi-color"),
   frameShape: document.querySelector("#frame-shape"),
+  exportCompass: document.querySelector("#export-compass"),
+  exportLegend: document.querySelector("#export-legend"),
   cropFrame: document.querySelector("#crop-frame"),
   fitContent: document.querySelector("#fit-content"),
   exportPng: document.querySelector("#export-png"),
@@ -780,18 +782,220 @@ async function exportPng() {
     const context = output.getContext("2d");
     context.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, output.width, output.height);
     drawExportFeatures(context, mapRect, frameRect, scaleX, scaleY);
+    drawExportDecorations(context, output);
 
-    const blob = await new Promise((resolve) => output.toBlob(resolve, "image/png"));
-    if (!blob) throw new Error("The map image could not be created.");
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "plainmap.png";
-    link.click();
-    URL.revokeObjectURL(link.href);
-    setMessage("PNG exported");
+    await downloadCanvas(output, "plainmap.png");
+    if (elements.exportLegend.value === "separate") {
+      await downloadCanvas(createLegendCanvas(), "plainmap-legend.png");
+      setMessage("Map and legend PNGs exported");
+    } else {
+      setMessage("PNG exported");
+    }
   } catch (error) {
     setMessage("Export failed. Check that map tiles finished loading.", true);
   }
+}
+
+function drawExportDecorations(context, output) {
+  if (elements.exportLegend.value === "inside") {
+    drawLegend(context, {
+      x: Math.round(output.width * 0.035),
+      y: Math.round(output.height * 0.035),
+      maxWidth: Math.round(output.width * 0.44),
+      maxHeight: Math.round(output.height * 0.9),
+      scale: Math.max(0.8, Math.min(1.5, output.width / 700)),
+    });
+  }
+  if (elements.exportCompass.checked) {
+    drawCompass(
+      context,
+      output.width - Math.round(output.width * 0.085),
+      Math.round(output.height * 0.09),
+      Math.max(0.85, Math.min(1.5, output.width / 700)),
+    );
+  }
+}
+
+function drawCompass(context, x, y, scale) {
+  const radius = 28 * scale;
+  const bearing = map.getBearing() * Math.PI / 180;
+  context.save();
+  context.translate(x, y);
+  context.beginPath();
+  context.arc(0, 0, radius, 0, Math.PI * 2);
+  context.fillStyle = "rgba(255, 255, 255, 0.94)";
+  context.fill();
+  context.lineWidth = 2 * scale;
+  context.strokeStyle = state.colors.poi;
+  context.stroke();
+
+  context.rotate(-bearing);
+  context.beginPath();
+  context.moveTo(0, -19 * scale);
+  context.lineTo(7 * scale, 8 * scale);
+  context.lineTo(0, 4 * scale);
+  context.lineTo(-7 * scale, 8 * scale);
+  context.closePath();
+  context.fillStyle = state.colors.route;
+  context.fill();
+  context.strokeStyle = "#ffffff";
+  context.lineWidth = 1.5 * scale;
+  context.stroke();
+  context.fillStyle = state.colors.poi;
+  context.font = `900 ${10 * scale}px sans-serif`;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText("N", 0, -radius - 8 * scale);
+  context.restore();
+}
+
+function legendItems() {
+  const items = [];
+  if (state.route.length >= 2) {
+    items.push({ type: "route", label: "Walking path" });
+  }
+  state.pois.forEach((poi, index) => {
+    if (poi.properties.visible === false) return;
+    items.push({
+      type: "poi",
+      number: index + 1,
+      label: poi.properties.label || `POI ${index + 1}`,
+    });
+  });
+  return items;
+}
+
+function drawLegend(context, options) {
+  const { x, y, maxWidth, maxHeight, scale } = options;
+  const items = legendItems();
+  const padding = 14 * scale;
+  const titleHeight = 25 * scale;
+  const rowHeight = 24 * scale;
+  const availableRows = Math.max(
+    1,
+    Math.floor((maxHeight - padding * 2 - titleHeight) / rowHeight),
+  );
+  const itemLimit = items.length > availableRows ? Math.max(1, availableRows - 1) : availableRows;
+  const shownItems = items.slice(0, itemLimit);
+  const hasMore = items.length > shownItems.length;
+  const rows = shownItems.length + (hasMore ? 1 : 0);
+  const width = Math.max(170 * scale, maxWidth);
+  const height = padding * 2 + titleHeight + Math.max(1, rows) * rowHeight;
+
+  context.save();
+  roundedRect(context, x, y, width, height, 10 * scale);
+  context.fillStyle = "rgba(255, 255, 255, 0.94)";
+  context.fill();
+  context.lineWidth = 2 * scale;
+  context.strokeStyle = "rgba(20, 33, 61, 0.9)";
+  context.stroke();
+
+  context.fillStyle = state.colors.poi;
+  context.font = `900 ${12 * scale}px sans-serif`;
+  context.textAlign = "left";
+  context.textBaseline = "middle";
+  context.fillText("LEGEND", x + padding, y + padding + 6 * scale);
+
+  if (!items.length) {
+    drawLegendText(
+      context,
+      "No visible map items",
+      x + padding,
+      y + padding + titleHeight,
+      width - padding * 2,
+      scale,
+    );
+    context.restore();
+    return;
+  }
+
+  shownItems.forEach((item, index) => {
+    const rowY = y + padding + titleHeight + index * rowHeight + rowHeight / 2;
+    if (item.type === "route") {
+      context.beginPath();
+      context.moveTo(x + padding, rowY);
+      context.lineTo(x + padding + 22 * scale, rowY);
+      context.strokeStyle = "#ffffff";
+      context.lineWidth = 7 * scale;
+      context.stroke();
+      context.strokeStyle = state.colors.route;
+      context.lineWidth = 4 * scale;
+      context.stroke();
+    } else {
+      context.beginPath();
+      context.arc(x + padding + 10 * scale, rowY, 9 * scale, 0, Math.PI * 2);
+      context.fillStyle = state.colors.poi;
+      context.fill();
+      context.fillStyle = "#ffffff";
+      context.font = `900 ${9 * scale}px sans-serif`;
+      context.textAlign = "center";
+      context.fillText(String(item.number), x + padding + 10 * scale, rowY);
+    }
+    drawLegendText(
+      context,
+      item.label,
+      x + padding + 32 * scale,
+      rowY,
+      width - padding * 2 - 32 * scale,
+      scale,
+    );
+  });
+
+  if (hasMore) {
+    const rowY = y + padding + titleHeight + shownItems.length * rowHeight + rowHeight / 2;
+    drawLegendText(
+      context,
+      `+${items.length - shownItems.length} more`,
+      x + padding + 32 * scale,
+      rowY,
+      width - padding * 2 - 32 * scale,
+      scale,
+    );
+  }
+  context.restore();
+}
+
+function drawLegendText(context, text, x, y, maxWidth, scale) {
+  context.fillStyle = state.colors.poi;
+  context.font = `700 ${11 * scale}px sans-serif`;
+  context.textAlign = "left";
+  context.textBaseline = "middle";
+  let output = text;
+  while (output.length > 1 && context.measureText(output).width > maxWidth) {
+    output = output.slice(0, -1);
+  }
+  if (output !== text) output = `${output.slice(0, -1)}...`;
+  context.fillText(output, x, y);
+}
+
+function createLegendCanvas() {
+  const items = legendItems();
+  const scale = 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = 720;
+  canvas.height = Math.max(220, 128 + Math.max(1, items.length) * 48);
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#fffdf8";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  drawLegend(context, {
+    x: 24,
+    y: 24,
+    maxWidth: canvas.width - 48,
+    maxHeight: canvas.height - 48,
+    scale,
+  });
+  return canvas;
+}
+
+async function downloadCanvas(canvas, filename) {
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("The image could not be created.");
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function drawExportFeatures(context, mapRect, frameRect, scaleX, scaleY) {
