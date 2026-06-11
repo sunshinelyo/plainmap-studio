@@ -34,6 +34,46 @@ def test_simple_poi_marker_setting_round_trips():
     assert project.model_dump(mode="json")["poi_simple_markers"] is True
 
 
+def test_usability_settings_round_trip():
+    project = Project(
+        workflow_stage=5,
+        quick_edit_mode=True,
+        imported_layers=[{"id": "layer-1", "name": "Trail", "visible": True, "locked": True, "data": {"type": "FeatureCollection", "features": []}}],
+        pois=[{
+            "id": "bridge",
+            "position": {"lat": 30.1, "lng": -97.2},
+            "label": "Bridge",
+            "display_mode": "text",
+            "short_text": "Bridge",
+            "use_category_defaults": False,
+        }],
+    )
+    data = project.model_dump(mode="json")
+    assert data["workflow_stage"] == 5
+    assert data["quick_edit_mode"] is True
+    assert data["imported_layers"][0]["locked"] is True
+    assert data["pois"][0]["display_mode"] == "text"
+
+
+def test_svg_uses_per_poi_short_text_and_layout_elements():
+    project = Project.model_validate({
+        "export": {"width": 800, "height": 600, "preset": "custom"},
+        "legend": {"visible": True, "position": {"x": 42, "y": 36}},
+        "compass": {"visible": True, "custom_position": {"x": 120, "y": 90}},
+        "pois": [{
+            "id": "bridge",
+            "position": {"lat": 30.1, "lng": -97.2},
+            "label": "Pedestrian bridge",
+            "display_mode": "text",
+            "short_text": "Bridge",
+        }],
+    })
+    svg = project_svg(project)
+    assert ">Bridge</text>" in svg
+    assert "Map key" in svg
+    assert 'translate(120.0 90.0)' in svg
+
+
 def test_parse_csv_coordinates():
     result = parse_csv(b"name,latitude,longitude\nStart,30.1,-97.2\n")
     assert result["features"][0]["geometry"]["coordinates"] == [-97.2, 30.1]

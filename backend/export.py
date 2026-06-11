@@ -24,6 +24,9 @@ def project_geojson(project: Project) -> dict:
                     "icon": poi.icon,
                     "color": poi.color,
                     "showLabel": poi.show_label,
+                    "displayMode": poi.display_mode,
+                    "shortText": poi.short_text,
+                    "useCategoryDefaults": poi.use_category_defaults,
                 },
                 "geometry": {
                     "type": "Point",
@@ -169,21 +172,31 @@ def project_svg(project: Project) -> str:
         )
     for index, poi in enumerate(project.pois):
         x, y = point_xy(poi.position)
-        marker = (
-            chr(65 + index % 26)
-            if project.poi_marker_mode == "letters"
-            else str(index + 1)
-            if project.poi_marker_mode == "numbers"
-            else ""
+        display_mode = poi.display_mode
+        icon_mode = display_mode == "icon" or (
+            display_mode == "auto" and project.poi_marker_mode == "icons"
         )
+        if display_mode == "text":
+            marker = (poi.short_text or poi.label or "POI")[:10]
+        elif display_mode == "reference":
+            marker = str(index + 1) if project.poi_marker_mode == "numbers" else chr(65 + index % 26)
+        else:
+            marker = (
+                chr(65 + index % 26)
+                if project.poi_marker_mode == "letters"
+                else str(index + 1)
+                if project.poi_marker_mode == "numbers"
+                else ""
+            )
         parts.append(
             f'<circle cx="{x:.1f}" cy="{y:.1f}" r="25" fill="{poi.color}" stroke="#111111" stroke-width="4"/>'
         )
-        if project.poi_marker_mode == "icons":
+        if icon_mode:
             parts.append(_material_symbol_svg(poi.icon, x, y))
         else:
+            font_size = 13 if display_mode == "text" else 26
             parts.append(
-                f'<text x="{x:.1f}" y="{y + 8:.1f}" text-anchor="middle" font-size="26" '
+                f'<text x="{x:.1f}" y="{y + font_size / 3:.1f}" text-anchor="middle" font-size="{font_size}" '
                 f'font-weight="700" fill="#111111">{escape(marker)}</text>'
             )
         if poi.show_label:
@@ -192,9 +205,28 @@ def project_svg(project: Project) -> str:
                 f'font-weight="700" fill="{project.palette.text}">{escape(poi.label)}</text>'
             )
     parts.append("</g>")
+    if project.legend.visible:
+        legend_x = max(12, min(width - project.legend.width - 12, project.legend.position.get("x", 20)))
+        legend_y = max(12, min(height - 80, project.legend.position.get("y", 20)))
+        legend_height = max(70, 38 + len(project.pois) * 24)
+        parts.append(
+            f'<g transform="translate({legend_x:.1f} {legend_y:.1f})" font-family="Arial, sans-serif">'
+            f'<rect width="{project.legend.width}" height="{legend_height}" rx="9" fill="#F7F5EF" '
+            'fill-opacity=".94" stroke="#111111" stroke-opacity=".35"/>'
+            '<text x="12" y="22" font-size="14" font-weight="700">Map key</text>'
+        )
+        for index, poi in enumerate(project.pois):
+            y = 44 + index * 24
+            legend_label = poi.label if poi.show_label else f"Point {index + 1}"
+            parts.append(
+                f'<circle cx="20" cy="{y - 4}" r="8" fill="{poi.color}" stroke="#111111" stroke-width="2"/>'
+                f'<text x="36" y="{y}" font-size="12">{escape(legend_label)}</text>'
+            )
+        parts.append("</g>")
     if project.compass.visible:
-        compass_x = width - 75 if "right" in project.compass.position else 75
-        compass_y = 75 if "top" in project.compass.position else height - 75
+        custom = project.compass.custom_position
+        compass_x = custom.get("x", width - 75 if "right" in project.compass.position else 75)
+        compass_y = custom.get("y", 75 if "top" in project.compass.position else height - 75)
         parts.append(
             f'<g transform="translate({compass_x} {compass_y}) rotate({-export_rotation})" '
             f'fill="{project.compass.color}" stroke="{project.compass.color}">'

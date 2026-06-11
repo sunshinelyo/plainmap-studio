@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,600,0,0">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css">
   <link rel="stylesheet" href="https://unpkg.com/@mapbox/mapbox-gl-draw@1.5.0/dist/mapbox-gl-draw.css">
-  <link rel="stylesheet" href="/assets/styles.css?v=12">
+  <link rel="stylesheet" href="/assets/styles.css?v=13">
 </head>
 <body>
   <header class="topbar">
@@ -27,9 +27,18 @@
     </div>
   </header>
 
+  <nav class="workflow-bar" aria-label="Map creation progress">
+    <div>
+      <span class="eyebrow">CURRENT STEP</span>
+      <strong id="current-stage-label">1. Import / Create Map</strong>
+    </div>
+    <div id="workflow-steps" class="workflow-steps"></div>
+    <label class="quick-edit-toggle"><input id="quick-edit-mode" type="checkbox"> Quick Edit Mode</label>
+  </nav>
+
   <main class="workspace">
     <aside class="sidebar" aria-label="Map editing tools">
-      <details open>
+      <details open data-stage="0">
         <summary>Location / Upload</summary>
         <div class="section-body">
           <form id="location-form" class="inline-form">
@@ -40,6 +49,13 @@
           <label class="button secondary full file-button">Upload map data
             <input id="data-upload" type="file" accept=".kml,.kmz,.gpx,.geojson,.json,.csv">
           </label>
+          <div id="import-layer-list" class="card-list"></div>
+        </div>
+      </details>
+
+      <details data-stage="1">
+        <summary>Base Map</summary>
+        <div class="section-body">
           <label>Map detail
             <select id="detail-level">
               <option value="minimal">Minimal</option>
@@ -60,7 +76,7 @@
         </div>
       </details>
 
-      <details open>
+      <details open data-stage="2">
         <summary>Points of Interest <span id="poi-count" class="count">0</span></summary>
         <div class="section-body">
           <button id="add-poi" class="button full">Add POI at map center</button>
@@ -85,7 +101,7 @@
         </div>
       </details>
 
-      <details>
+      <details data-stage="3">
         <summary>Route</summary>
         <div class="section-body">
           <label>Route method
@@ -103,13 +119,24 @@
             <button id="reverse-route" class="button secondary">Reverse</button>
             <button id="clear-route" class="button danger">Clear</button>
           </div>
+          <div class="button-row">
+            <button id="undo-route" class="button secondary">Undo</button>
+            <button id="redo-route" class="button secondary">Redo</button>
+          </div>
+          <div class="button-row">
+            <button id="revert-route" class="button secondary">Revert saved</button>
+            <button id="reset-route" class="button danger">Reset Route</button>
+          </div>
           <button id="clear-edit-handles" class="button secondary full">Clear edit handles</button>
-          <p class="hint">In edit mode, drag handles, click the route to add one, or right-click/select + Delete to remove one.</p>
+          <div id="route-edit-help" class="onboarding-note">
+            <strong>Viewing mode:</strong> your route is protected. Turn on Edit Mode to reveal large vertex handles.
+            Drag a handle to move it, click the route to add one, and right-click a handle or select it + Delete to remove it.
+          </div>
           <label class="check-row"><input id="show-arrows" type="checkbox" checked> Direction arrows</label>
         </div>
       </details>
 
-      <details>
+      <details data-stage="4">
         <summary>Parking</summary>
         <div class="section-body">
           <button id="draw-parking" class="button full">Draw parking polygon</button>
@@ -118,7 +145,7 @@
         </div>
       </details>
 
-      <details>
+      <details data-stage="5">
         <summary>Colors</summary>
         <div id="palette-controls" class="section-body color-grid"></div>
         <div class="section-body compact-top">
@@ -126,7 +153,7 @@
         </div>
       </details>
 
-      <details>
+      <details data-stage="5">
         <summary>Orientation</summary>
         <div class="section-body">
           <div class="segmented">
@@ -142,10 +169,12 @@
         </div>
       </details>
 
-      <details>
+      <details data-stage="5">
         <summary>Compass</summary>
         <div class="section-body">
           <label class="check-row"><input id="compass-visible" type="checkbox" checked> Show compass</label>
+          <label class="check-row"><input id="compass-locked" type="checkbox"> Lock compass</label>
+          <label class="check-row"><input id="compass-snap" type="checkbox" checked> Snap to edges</label>
           <label>Position
             <select id="compass-position">
               <option value="top-right">Top right</option>
@@ -159,18 +188,21 @@
         </div>
       </details>
 
-      <details>
+      <details data-stage="5">
         <summary>Legend</summary>
         <div class="section-body">
           <label class="check-row"><input id="legend-visible" type="checkbox" checked> Show legend</label>
+          <label class="check-row"><input id="legend-locked" type="checkbox"> Lock legend</label>
+          <label class="check-row"><input id="legend-snap" type="checkbox" checked> Snap to edges</label>
           <div id="legend-toggles"></div>
           <p class="hint">Drag the legend on the map. Resize it from its lower-right corner.</p>
         </div>
       </details>
 
-      <details open>
+      <details open data-stage="6,7">
         <summary>Export</summary>
         <div class="section-body">
+          <div id="review-summary" class="review-summary" hidden></div>
           <label>Output size
             <select id="export-preset">
               <option value="square">1:1 (1080 x 1080)</option>
@@ -203,6 +235,10 @@
           <p class="hint">PNG captures the visual basemap. SVG/PDF provide editable vector overlays.</p>
         </div>
       </details>
+      <div class="stage-navigation">
+        <button id="previous-stage" class="button secondary">Back</button>
+        <button id="next-stage" class="button">Next step</button>
+      </div>
     </aside>
 
     <section class="canvas-area">
@@ -240,12 +276,26 @@
     </section>
   </main>
 
+  <dialog id="import-options-dialog">
+    <form method="dialog" class="dialog-card">
+      <h2>Import map data</h2>
+      <p>What would you like to do with existing map data?</p>
+      <label><input type="radio" name="import-mode" value="layer" checked> Import as new layer</label>
+      <label><input type="radio" name="import-mode" value="merge"> Merge with existing map</label>
+      <label><input type="radio" name="import-mode" value="replace"> Replace everything</label>
+      <div class="button-row">
+        <button value="cancel" class="button secondary">Cancel</button>
+        <button id="confirm-import" value="default" class="button">Import</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script>
   <script>window.mapboxgl = window.maplibregl;</script>
   <script src="https://unpkg.com/@mapbox/mapbox-gl-draw@1.5.0/dist/mapbox-gl-draw.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
-  <script src="/assets/app.js?v=13"></script>
+  <script src="/assets/app.js?v=14"></script>
 </body>
 </html>

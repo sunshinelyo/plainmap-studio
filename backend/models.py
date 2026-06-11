@@ -17,6 +17,9 @@ class POI(BaseModel):
     category: str = "photo-stop"
     icon: str = "photo_camera"
     color: str = "#F97316"
+    display_mode: Literal["auto", "icon", "text", "reference"] = "auto"
+    short_text: str = ""
+    use_category_defaults: bool = True
     selected: bool = True
     show_label: bool = True
 
@@ -47,12 +50,18 @@ class CompassSettings(BaseModel):
     position: Literal["top-left", "top-right", "bottom-left", "bottom-right"] = "top-right"
     size: int = Field(default=72, ge=40, le=160)
     color: str = "#111111"
+    locked: bool = False
+    snap: bool = True
+    custom_position: dict[str, float] = Field(default_factory=dict)
 
 
 class LegendSettings(BaseModel):
     visible: bool = True
     position: dict[str, float] = Field(default_factory=lambda: {"x": 20, "y": 20})
     width: int = 190
+    height: int = 0
+    locked: bool = False
+    snap: bool = True
     items: dict[str, bool] = Field(
         default_factory=lambda: {
             "meeting": True,
@@ -83,7 +92,7 @@ class ExportBoundary(BaseModel):
 
 
 class Project(BaseModel):
-    version: int = 3
+    version: int = 4
     project_id: str | None = None
     owner_id: str | None = None
     name: str = "Untitled map"
@@ -92,6 +101,8 @@ class Project(BaseModel):
     detail_level: Literal["minimal", "standard", "detailed"] = "standard"
     poi_marker_mode: Literal["letters", "numbers", "icons"] = "letters"
     poi_simple_markers: bool = False
+    workflow_stage: int = Field(default=0, ge=0, le=7)
+    quick_edit_mode: bool = False
     pois: list[POI] = Field(default_factory=list)
     route: list[Coordinate] = Field(default_factory=list)
     route_mode: Literal["straight", "walking", "manual"] = "straight"
@@ -107,6 +118,7 @@ class Project(BaseModel):
     imported_features: dict[str, Any] = Field(
         default_factory=lambda: {"type": "FeatureCollection", "features": []}
     )
+    imported_layers: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class RouteRequest(BaseModel):

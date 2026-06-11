@@ -9,7 +9,7 @@ const AUSTIN_PALETTE = {
 };
 
 const DEFAULT_PROJECT = {
-  version: 3,
+  version: 4,
   project_id: null,
   owner_id: null,
   name: "Untitled map",
@@ -18,6 +18,8 @@ const DEFAULT_PROJECT = {
   detail_level: "standard",
   poi_marker_mode: "letters",
   poi_simple_markers: false,
+  workflow_stage: 0,
+  quick_edit_mode: false,
   pois: [],
   route: [],
   route_mode: "straight",
@@ -26,11 +28,14 @@ const DEFAULT_PROJECT = {
   palette: { ...AUSTIN_PALETTE },
   rotation: 0,
   orientation_mode: "north",
-  compass: { visible: true, position: "top-right", size: 72, color: "#111111" },
+  compass: { visible: true, position: "top-right", size: 72, color: "#111111", locked: false, snap: true, custom_position: {} },
   legend: {
     visible: true,
     position: { x: 20, y: 20 },
     width: 190,
+    height: 0,
+    locked: false,
+    snap: true,
     items: { meeting: true, parking: true, route: true, photoStops: true, arrows: true },
   },
   export: { preset: "portrait", width: 1080, height: 1350 },
@@ -46,6 +51,7 @@ const DEFAULT_PROJECT = {
     bounds: {},
   },
   imported_features: { type: "FeatureCollection", features: [] },
+  imported_layers: [],
 };
 
 const paletteLabels = {
@@ -63,8 +69,24 @@ const categoryOptions = [
   ["meeting-point", "Meeting point"],
   ["restroom", "Restroom"],
   ["landmark", "Landmark"],
+  ["parking", "Parking"],
+  ["train", "Train"],
   ["food", "Food"],
   ["other", "Other"],
+];
+const categoryDefaults = {
+  "photo-stop": { color: "#F97316", icon: "photo_camera" },
+  "meeting-point": { color: "#F5D61E", icon: "groups" },
+  parking: { color: "#8E5AD7", icon: "local_parking" },
+  train: { color: "#4DA3FF", icon: "train" },
+  food: { color: "#E24A3B", icon: "restaurant" },
+  restroom: { color: "#2AA198", icon: "wc" },
+  landmark: { color: "#6B8E23", icon: "landscape" },
+  other: { color: "#F97316", icon: "location_on" },
+};
+const workflowStages = [
+  "Import / Create Map", "Configure Base Map", "Add Points of Interest", "Build / Edit Route",
+  "Configure Parking", "Customize Appearance", "Configure Export", "Review & Export",
 ];
 
 const materialIcons = [
@@ -123,6 +145,10 @@ let baseLayerVisibility = new Map();
 let styleReady = false;
 let toastTimer;
 let boundaryInteraction = null;
+let pendingImportFile = null;
+let routeUndoStack = [];
+let routeRedoStack = [];
+let lastSavedRoute = [];
 
 const el = (id) => document.getElementById(id);
 const uuid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
@@ -145,6 +171,38 @@ const pointFeature = (coordinates, properties = {}) => ({
   properties,
   geometry: { type: "Point", coordinates },
 });
+
+function renderWorkflow() {
+  el("current-stage-label").textContent = `${project.workflow_stage + 1}. ${workflowStages[project.workflow_stage]}`;
+  el("workflow-steps").innerHTML = workflowStages.map((label, index) => `
+    <button type="button" data-workflow-stage="${index}"
+      class="${index === project.workflow_stage ? "active" : ""} ${index < project.workflow_stage ? "complete" : ""}"
+      ${index > project.workflow_stage && !project.quick_edit_mode ? "disabled" : ""}
+      title="${escapeHtml(label)}">${index + 1}</button>
+  `).join("");
+  el("quick-edit-mode").checked = project.quick_edit_mode;
+  document.body.classList.toggle("quick-edit", project.quick_edit_mode);
+  document.querySelectorAll(".sidebar details[data-stage]").forEach((section) => {
+    const stages = section.dataset.stage.split(",").map(Number);
+    section.hidden = !project.quick_edit_mode && !stages.includes(project.workflow_stage);
+    if (!section.hidden && !project.quick_edit_mode) section.open = true;
+  });
+  el("previous-stage").disabled = project.workflow_stage === 0;
+  el("next-stage").disabled = project.workflow_stage === workflowStages.length - 1;
+  el("next-stage").textContent = project.workflow_stage === workflowStages.length - 2 ? "Review map" : "Next step";
+  const review = el("review-summary");
+  review.hidden = project.workflow_stage !== 7 || project.quick_edit_mode;
+  review.innerHTML = `
+    <strong>Ready to export</strong>
+    <span>${project.pois.length} POIs · ${project.route.length} route vertices · ${project.parking.length} parking areas</span>
+    ${project.route.length < 2 ? "<span class=\"review-warning\">No complete route yet.</span>" : ""}
+  `;
+}
+
+function setWorkflowStage(stage) {
+  project.workflow_stage = Math.max(0, Math.min(workflowStages.length - 1, Number(stage)));
+  renderWorkflow();
+}
 const featureCollection = (features = []) => ({ type: "FeatureCollection", features });
 
 function showToast(message) {
@@ -346,7 +404,7 @@ function addProjectSourcesAndLayers() {
     paint: { "line-color": ["get", "borderColor"], "line-width": 3 },
   });
 
-  map.addSource("plainmap-imported", { type: "geojson", data: project.imported_features });
+  map.addSource("plainmap-imported", { type: "geojson", data: importedLayerGeoJSON() });
   map.addLayer({
     id: "plainmap-imported-fill",
     type: "fill",
@@ -436,6 +494,10 @@ function parkingGeoJSON() {
 }
 
 function markerText(poi, index) {
+  const mode = poi.display_mode || "auto";
+  if (mode === "text") return String(poi.short_text || poi.label || "POI").slice(0, 10);
+  if (mode === "icon") return normalizeMaterialIcon(poi.icon);
+  if (mode === "reference") return project.poi_marker_mode === "numbers" ? String(index + 1) : letters(index);
   if (project.poi_marker_mode === "numbers") return String(index + 1);
   if (project.poi_marker_mode === "icons") return normalizeMaterialIcon(poi.icon);
   return letters(index);
@@ -443,9 +505,10 @@ function markerText(poi, index) {
 
 function markerContent(poi, index) {
   const value = markerText(poi, index);
-  return project.poi_marker_mode === "icons"
+  const iconMode = poi.display_mode === "icon" || (poi.display_mode === "auto" && project.poi_marker_mode === "icons");
+  return iconMode
     ? `<span class="material-symbols-outlined">${escapeHtml(value)}</span>`
-    : `<span>${escapeHtml(value)}</span>`;
+    : `<span class="${poi.display_mode === "text" ? "short-text" : ""}">${escapeHtml(value)}</span>`;
 }
 
 function markerPreview(poi, index) {
@@ -453,7 +516,7 @@ function markerPreview(poi, index) {
     return `<span class="marker-preview marker-preview-dot" style="--poi-color:${poi.color}"></span>`;
   }
   return `
-    <span class="marker-preview marker-preview-pin ${project.poi_marker_mode === "icons" ? "icon-mode" : ""}"
+    <span class="marker-preview marker-preview-pin ${(poi.display_mode === "icon" || (poi.display_mode === "auto" && project.poi_marker_mode === "icons")) ? "icon-mode" : ""}"
       style="--poi-color:${poi.color}">
       ${markerContent(poi, index)}
     </span>
@@ -478,7 +541,7 @@ function markerElement(poi, index) {
     return root;
   }
   root.innerHTML = `
-    <div class="poi-pin ${project.poi_marker_mode === "icons" ? "icon-mode" : ""}">
+    <div class="poi-pin ${(poi.display_mode === "icon" || (poi.display_mode === "auto" && project.poi_marker_mode === "icons")) ? "icon-mode" : ""}">
       <svg class="poi-pin-svg" viewBox="0 0 40 52" aria-hidden="true">
         <path d="M20 1.5C9.5 1.5 2 9.2 2 19.5C2 33 20 52 20 52S38 33 38 19.5C38 9.2 30.5 1.5 20 1.5Z"
           fill="${poi.color}" stroke="#111111" stroke-width="3"/>
@@ -501,6 +564,9 @@ function addPoi(latlng, overrides = {}) {
     category: overrides.category || "photo-stop",
     icon: normalizeMaterialIcon(overrides.icon || "photo_camera"),
     color: overrides.color || project.palette.poi,
+    display_mode: overrides.display_mode || "auto",
+    short_text: overrides.short_text || "",
+    use_category_defaults: overrides.use_category_defaults !== false,
     selected: true,
     show_label: true,
   });
@@ -577,6 +643,19 @@ function renderPoiList() {
             </select>
           </label>
           <div class="mini-grid">
+            <label>Marker display
+              <select data-field="display_mode">
+                <option value="auto" ${poi.display_mode === "auto" ? "selected" : ""}>Project default</option>
+                <option value="icon" ${poi.display_mode === "icon" ? "selected" : ""}>Icon</option>
+                <option value="text" ${poi.display_mode === "text" ? "selected" : ""}>Short Text</option>
+                <option value="reference" ${poi.display_mode === "reference" ? "selected" : ""}>Letter / Number</option>
+              </select>
+            </label>
+            <label>Short text
+              <input data-field="short_text" maxlength="10" placeholder="Bridge" value="${escapeHtml(poi.short_text || "")}">
+            </label>
+          </div>
+          <div class="mini-grid">
             <label>Category
               <select data-field="category">
                 ${categoryOptions.map(([value, label]) => `<option value="${value}" ${poi.category === value ? "selected" : ""}>${label}</option>`).join("")}
@@ -588,6 +667,7 @@ function renderPoiList() {
               </select>
             </label>
           </div>
+          <label class="check-row"><input data-field="use_category_defaults" type="checkbox" ${poi.use_category_defaults !== false ? "checked" : ""}> Use category defaults</label>
           <div class="mini-grid">
             <label>Color <input data-field="color" type="color" value="${poi.color}"></label>
             <label class="check-row"><input data-field="selected" type="checkbox" ${poi.selected ? "checked" : ""}> Include in route</label>
@@ -602,10 +682,20 @@ function renderPoiList() {
 function bindPoiList() {
   el("poi-list").addEventListener("input", (event) => {
     const coordinate = event.target.dataset.coordinate;
-    if (!coordinate) return;
     const card = event.target.closest(".editor-card");
     const poi = card && project.pois.find((item) => item.id === card.dataset.id);
     if (!poi) return;
+    if (event.target.dataset.field === "short_text") {
+      poi.short_text = event.target.value.slice(0, 10);
+      const markerValue = markerText(poi, project.pois.indexOf(poi));
+      const mapValue = poiMarkers.get(poi.id)?.getElement().querySelector(".poi-pin > span");
+      if (mapValue) mapValue.textContent = markerValue;
+      const previewValue = card.querySelector(".marker-preview > span");
+      if (previewValue) previewValue.textContent = markerValue;
+      renderLegend();
+      return;
+    }
+    if (!coordinate) return;
     applyCoordinateInput(event.target, card, poi, coordinate);
   });
   el("poi-list").addEventListener("change", async (event) => {
@@ -638,7 +728,19 @@ function bindPoiList() {
     const field = event.target.dataset.field;
     if (!field) return;
     poi[field] = event.target.type === "checkbox" ? event.target.checked : event.target.value;
+    if (field === "category" && poi.use_category_defaults !== false) {
+      const defaults = categoryDefaults[poi.category] || categoryDefaults.other;
+      poi.color = defaults.color;
+      poi.icon = defaults.icon;
+    }
+    if (["color", "icon"].includes(field)) poi.use_category_defaults = false;
+    if (field === "use_category_defaults" && poi.use_category_defaults) {
+      const defaults = categoryDefaults[poi.category] || categoryDefaults.other;
+      poi.color = defaults.color;
+      poi.icon = defaults.icon;
+    }
     renderPois();
+    renderLegend();
     if (project.route_mode !== "manual" && field === "selected") buildRoute(false);
   });
   el("poi-list").addEventListener("click", async (event) => {
@@ -714,6 +816,7 @@ async function fetchNearbySuggestions(poiId) {
 
 async function buildRoute(notify = true) {
   clearRouteEditHandles();
+  recordRouteState();
   const selected = project.pois.filter((poi) => poi.selected).map((poi) => poi.position);
   if (project.route_mode === "manual") {
     drawPurpose = "route";
@@ -749,6 +852,42 @@ async function buildRoute(notify = true) {
   if (notify) showToast("Route updated");
 }
 
+function cloneRoute(route = project.route) {
+  return route.map((point) => ({ lat: point.lat, lng: point.lng }));
+}
+
+function recordRouteState() {
+  routeUndoStack.push(cloneRoute());
+  if (routeUndoStack.length > 50) routeUndoStack.shift();
+  routeRedoStack = [];
+  updateRouteHistoryControls();
+}
+
+function restoreRoute(route) {
+  project.route = cloneRoute(route);
+  selectedRouteVertex = null;
+  renderRoute();
+  updateRouteHistoryControls();
+}
+
+function undoRoute() {
+  if (!routeUndoStack.length) return;
+  routeRedoStack.push(cloneRoute());
+  restoreRoute(routeUndoStack.pop());
+}
+
+function redoRoute() {
+  if (!routeRedoStack.length) return;
+  routeUndoStack.push(cloneRoute());
+  restoreRoute(routeRedoStack.pop());
+}
+
+function updateRouteHistoryControls() {
+  el("undo-route").disabled = routeUndoStack.length === 0;
+  el("redo-route").disabled = routeRedoStack.length === 0;
+  el("revert-route").disabled = lastSavedRoute.length === 0;
+}
+
 function renderRoute() {
   if (!styleReady) return;
   map.getSource("plainmap-route")?.setData(routeGeoJSON());
@@ -762,6 +901,9 @@ function toggleRouteEditMode(force) {
   routeEditMode = typeof force === "boolean" ? force : !routeEditMode;
   el("edit-route").textContent = `Edit mode: ${routeEditMode ? "on" : "off"}`;
   el("edit-route").classList.toggle("active", routeEditMode);
+  el("route-edit-help").innerHTML = routeEditMode
+    ? "<strong>Editing mode:</strong> drag a large handle to move it, click the route to add a vertex, or right-click/select + Delete to remove one."
+    : "<strong>Viewing mode:</strong> your route is protected. Turn on Edit Mode to reveal large vertex handles.";
   if (routeEditMode) {
     if (project.route.length < 2) {
       routeEditMode = false;
@@ -807,6 +949,7 @@ function renderRouteEditHandles() {
       .setLngLat([point.lng, point.lat])
       .addTo(map);
     marker.on("dragend", () => {
+      recordRouteState();
       const location = marker.getLngLat();
       project.route[index] = { lat: location.lat, lng: location.lng };
       renderRoute();
@@ -831,6 +974,7 @@ function deleteRouteVertex(index) {
     showToast("A route needs at least two vertices");
     return;
   }
+  recordRouteState();
   project.route.splice(index, 1);
   selectedRouteVertex = null;
   renderRoute();
@@ -850,6 +994,7 @@ function handleRouteLineClick(event) {
       insertAt = index + 1;
     }
   }
+  recordRouteState();
   project.route.splice(insertAt, 0, { lat: event.lngLat.lat, lng: event.lngLat.lng });
   selectedRouteVertex = insertAt;
   renderRoute();
@@ -867,6 +1012,7 @@ function handleDrawCreate(event) {
   const feature = event.features[0];
   draw.delete(feature.id);
   if (drawPurpose === "route" && feature.geometry.type === "LineString") {
+    recordRouteState();
     project.route = feature.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }));
     project.route_mode = "manual";
     el("route-mode").value = "manual";
@@ -999,12 +1145,82 @@ function startParkingEdit(id) {
 
 function renderImportedFeatures(fit = false) {
   if (!styleReady) return;
-  map.getSource("plainmap-imported")?.setData(project.imported_features);
-  if (fit && project.imported_features.features.length) {
+  const visibleData = importedLayerGeoJSON();
+  map.getSource("plainmap-imported")?.setData(visibleData);
+  if (fit && visibleData.features.length) {
     const coordinates = [];
-    for (const feature of project.imported_features.features) collectCoordinates(feature.geometry?.coordinates, coordinates);
+    for (const feature of visibleData.features) collectCoordinates(feature.geometry?.coordinates, coordinates);
     fitCoordinateList(coordinates);
   }
+  renderImportLayers();
+}
+
+function importedLayerGeoJSON() {
+  const features = project.imported_layers.length
+    ? project.imported_layers.filter((layer) => layer.visible !== false).flatMap((layer) => (
+      (layer.data?.features || []).map((feature) => ({
+        ...feature,
+        properties: { ...feature.properties, __plainmapLayerId: layer.id },
+      }))
+    ))
+    : project.imported_features.features || [];
+  return featureCollection(features);
+}
+
+function renderImportLayers() {
+  el("import-layer-list").innerHTML = project.imported_layers.map((layer, index) => `
+    <article class="layer-card" data-layer-id="${layer.id}">
+      <div class="layer-card-title">
+        <input data-layer-field="name" value="${escapeHtml(layer.name)}" aria-label="Layer name">
+        <button class="icon-button layer-up" ${index === 0 ? "disabled" : ""} title="Move layer up">↑</button>
+        <button class="icon-button layer-down" ${index === project.imported_layers.length - 1 ? "disabled" : ""} title="Move layer down">↓</button>
+        <button class="icon-button delete-layer" title="Delete layer">x</button>
+      </div>
+      <div class="button-row">
+        <label class="check-row"><input data-layer-field="visible" type="checkbox" ${layer.visible !== false ? "checked" : ""}> Visible</label>
+        <label class="check-row"><input data-layer-field="locked" type="checkbox" ${layer.locked ? "checked" : ""}> Locked</label>
+      </div>
+      ${(layer.data?.features || []).some((feature) => feature.geometry?.type.includes("LineString"))
+        ? `<button class="button secondary full convert-layer-route">Convert route to editable</button>`
+        : ""}
+    </article>
+  `).join("") || `<p class="hint">Imported reference layers will appear here.</p>`;
+}
+
+function bindImportLayers() {
+  el("import-layer-list").addEventListener("change", (event) => {
+    const card = event.target.closest("[data-layer-id]");
+    const layer = card && project.imported_layers.find((item) => item.id === card.dataset.layerId);
+    const field = event.target.dataset.layerField;
+    if (!layer || !field) return;
+    layer[field] = event.target.type === "checkbox" ? event.target.checked : event.target.value;
+    renderImportedFeatures();
+  });
+  el("import-layer-list").addEventListener("click", (event) => {
+    const card = event.target.closest("[data-layer-id]");
+    const index = card && project.imported_layers.findIndex((item) => item.id === card.dataset.layerId);
+    if (index === null || index < 0) return;
+    const layer = project.imported_layers[index];
+    if (event.target.closest(".delete-layer")) project.imported_layers.splice(index, 1);
+    if (event.target.closest(".layer-up") && index > 0) {
+      [project.imported_layers[index - 1], project.imported_layers[index]] = [layer, project.imported_layers[index - 1]];
+    }
+    if (event.target.closest(".layer-down") && index < project.imported_layers.length - 1) {
+      [project.imported_layers[index + 1], project.imported_layers[index]] = [layer, project.imported_layers[index + 1]];
+    }
+    if (event.target.closest(".convert-layer-route")) {
+      if (layer.locked) return showToast("Unlock this layer before converting its route");
+      const feature = layer.data.features.find((item) => item.geometry?.type === "LineString");
+      if (!feature) return showToast("This layer has no editable LineString route");
+      recordRouteState();
+      project.route = feature.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }));
+      project.route_mode = "manual";
+      el("route-mode").value = "manual";
+      renderRoute();
+      showToast("Imported route converted to an editable route");
+    }
+    renderImportedFeatures();
+  });
 }
 
 function collectCoordinates(value, output) {
@@ -1016,6 +1232,8 @@ function collectCoordinates(value, output) {
 function handleImportedPolygonClick(event) {
   const feature = event.features?.[0];
   if (!feature || !feature.geometry.type.includes("Polygon")) return;
+  const layer = project.imported_layers.find((item) => item.id === feature.properties?.__plainmapLayerId);
+  if (layer?.locked) return showToast("Unlock this layer before converting its polygons");
   const coordinates = feature.geometry.type === "MultiPolygon"
     ? feature.geometry.coordinates[0][0]
     : feature.geometry.coordinates[0];
@@ -1376,10 +1594,21 @@ function fitBoundaryToRoute() {
 function renderCompass() {
   const compass = el("compass");
   compass.hidden = !project.compass.visible;
-  compass.className = `compass ${project.compass.position}`;
+  compass.className = `compass ${project.compass.position} ${project.compass.locked ? "locked" : ""}`;
   compass.style.width = `${project.compass.size}px`;
   compass.style.height = `${project.compass.size}px`;
   compass.style.color = project.compass.color;
+  if (Number.isFinite(project.compass.custom_position?.x)) {
+    compass.style.left = `${project.compass.custom_position.x}px`;
+    compass.style.top = `${project.compass.custom_position.y}px`;
+    compass.style.right = "auto";
+    compass.style.bottom = "auto";
+  } else {
+    compass.style.left = "";
+    compass.style.top = "";
+    compass.style.right = "";
+    compass.style.bottom = "";
+  }
   // MapLibre bearing is clockwise camera rotation; north on screen moves by the inverse angle.
   compass.querySelector(".compass-arrow").style.transform = `rotate(${-map.getBearing()}deg)`;
 }
@@ -1402,15 +1631,24 @@ function renderLegend() {
   const legend = el("legend");
   legend.hidden = !project.legend.visible;
   legend.style.width = `${project.legend.width}px`;
+  legend.style.height = project.legend.height ? `${project.legend.height}px` : "";
+  legend.classList.toggle("locked", project.legend.locked);
+  legend.style.left = `${project.legend.position.x}px`;
+  legend.style.top = `${project.legend.position.y}px`;
+  legend.style.bottom = "auto";
   const items = [];
   if (project.legend.items.meeting) items.push(`<div class="legend-item"><span class="legend-dot" style="background:${project.palette.meeting}"></span> Meeting point</div>`);
   if (project.legend.items.parking) items.push(`<div class="legend-item"><span class="legend-icon" style="background:${project.palette.parking}"><span class="material-symbols-outlined">local_parking</span></span> Parking</div>`);
   if (project.legend.items.route) items.push(`<div class="legend-item"><span class="legend-icon" style="background:${project.palette.route}"><span class="material-symbols-outlined">directions_walk</span></span> Walking route</div>`);
   if (project.legend.items.photoStops) {
-    const symbol = project.poi_marker_mode === "icons"
-      ? `<span class="legend-icon"><span class="material-symbols-outlined">photo_camera</span></span>`
-      : `<span class="legend-dot" style="background:${project.palette.poi}"></span>`;
-    items.push(`<div class="legend-item">${symbol} Photo stops</div>`);
+    project.pois.forEach((poi, index) => {
+      const iconMode = poi.display_mode === "icon" || (poi.display_mode === "auto" && project.poi_marker_mode === "icons");
+      const symbol = iconMode
+        ? `<span class="legend-icon" style="background:${poi.color}"><span class="material-symbols-outlined">${escapeHtml(normalizeMaterialIcon(poi.icon))}</span></span>`
+        : `<span class="legend-icon legend-text-marker" style="background:${poi.color}">${escapeHtml(markerText(poi, index))}</span>`;
+      items.push(`<div class="legend-item">${symbol} ${escapeHtml(poi.label)}</div>`);
+    });
+    if (!project.pois.length) items.push(`<div class="legend-item"><span class="legend-dot" style="background:${project.palette.poi}"></span> Points of interest</div>`);
   }
   if (project.legend.items.arrows) items.push(`<div class="legend-item"><strong>↑</strong> Direction</div>`);
   el("legend-content").innerHTML = items.join("");
@@ -1420,6 +1658,7 @@ function makeLegendDraggable() {
   const legend = el("legend");
   let drag = null;
   legend.addEventListener("pointerdown", (event) => {
+    if (project.legend.locked) return;
     if (event.offsetX > legend.clientWidth - 18 && event.offsetY > legend.clientHeight - 18) return;
     drag = { x: event.clientX, y: event.clientY, left: legend.offsetLeft, top: legend.offsetTop };
     legend.setPointerCapture(event.pointerId);
@@ -1434,8 +1673,58 @@ function makeLegendDraggable() {
     if (!drag) return;
     project.legend.position = { x: legend.offsetLeft, y: legend.offsetTop };
     project.legend.width = legend.offsetWidth;
+    if (project.legend.snap) snapLayoutElement(legend, project.legend, false);
     drag = null;
   });
+  new ResizeObserver(() => {
+    if (project.legend.locked) return;
+    project.legend.width = legend.offsetWidth;
+    project.legend.height = legend.offsetHeight;
+  }).observe(legend);
+}
+
+function makeCompassDraggable() {
+  const compass = el("compass");
+  let drag = null;
+  compass.addEventListener("pointerdown", (event) => {
+    if (project.compass.locked) return;
+    drag = { x: event.clientX, y: event.clientY, left: compass.offsetLeft, top: compass.offsetTop };
+    compass.setPointerCapture(event.pointerId);
+  });
+  compass.addEventListener("pointermove", (event) => {
+    if (!drag) return;
+    compass.style.left = `${Math.max(0, drag.left + event.clientX - drag.x)}px`;
+    compass.style.top = `${Math.max(0, drag.top + event.clientY - drag.y)}px`;
+    compass.style.right = "auto";
+    compass.style.bottom = "auto";
+  });
+  compass.addEventListener("pointerup", () => {
+    if (!drag) return;
+    project.compass.custom_position = { x: compass.offsetLeft, y: compass.offsetTop };
+    if (project.compass.snap) snapLayoutElement(compass, project.compass, true);
+    drag = null;
+  });
+}
+
+function snapLayoutElement(node, settings, isCompass) {
+  const frame = el("map-frame");
+  const margin = 18;
+  const left = node.offsetLeft + node.offsetWidth / 2 < frame.clientWidth / 2;
+  const top = node.offsetTop + node.offsetHeight / 2 < frame.clientHeight / 2;
+  const x = left ? margin : frame.clientWidth - node.offsetWidth - margin;
+  const y = top ? margin : frame.clientHeight - node.offsetHeight - margin;
+  node.style.left = `${x}px`;
+  node.style.top = `${y}px`;
+  node.style.right = "auto";
+  node.style.bottom = "auto";
+  if (isCompass) {
+    settings.position = `${top ? "top" : "bottom"}-${left ? "left" : "right"}`;
+    settings.custom_position = {};
+    el("compass-position").value = settings.position;
+    renderCompass();
+  } else {
+    settings.position = { x, y };
+  }
 }
 
 async function geocodeLocation(query) {
@@ -1454,7 +1743,7 @@ async function geocodeLocation(query) {
   }
 }
 
-async function uploadMapData(file) {
+async function uploadMapData(file, mode = "layer") {
   const form = new FormData();
   form.append("file", file);
   setStatus(`Importing ${file.name}...`);
@@ -1462,20 +1751,38 @@ async function uploadMapData(file) {
     const response = await fetch(apiUrl("/api/import"), { method: "POST", body: form });
     if (!response.ok) throw new Error((await response.json()).detail);
     const data = await response.json();
-    project.imported_features = data;
-    data.features.filter((feature) => feature.geometry?.type === "Point").forEach((feature) => {
-      const [lng, lat] = feature.geometry.coordinates;
-      addPoi({ lat, lng }, { label: feature.properties?.label || feature.properties?.name || "Imported point" });
-    });
-    const firstRoute = data.features.find((feature) => feature.geometry?.type === "LineString");
-    if (firstRoute) {
-      project.route = firstRoute.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }));
-      project.route_mode = "manual";
-      el("route-mode").value = "manual";
+    if (mode === "replace") {
+      project.pois = [];
+      project.route = [];
+      project.parking = [];
+      project.imported_layers = [];
     }
+    if (mode === "merge") {
+      data.features.filter((feature) => feature.geometry?.type === "Point").forEach((feature) => {
+        const [lng, lat] = feature.geometry.coordinates;
+        addPoi({ lat, lng }, { label: feature.properties?.label || feature.properties?.name || "Imported point" });
+      });
+      const firstRoute = data.features.find((feature) => feature.geometry?.type === "LineString");
+      if (firstRoute) {
+        recordRouteState();
+        project.route = firstRoute.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }));
+        project.route_mode = "manual";
+        el("route-mode").value = "manual";
+      }
+    }
+    project.imported_layers.push({
+      id: uuid(),
+      name: file.name.replace(/\.[^.]+$/, "") || `Layer ${project.imported_layers.length + 1}`,
+      visible: true,
+      locked: mode === "layer",
+      data,
+    });
+    project.imported_features = featureCollection([]);
     renderImportedFeatures(true);
     renderRoute();
-    showToast(`Imported ${data.features.length} features`);
+    renderPois();
+    renderParking();
+    showToast(`Imported ${data.features.length} features ${mode === "layer" ? "as a reference layer" : ""}`);
   } catch (error) {
     showToast(error.message);
   } finally {
@@ -1514,6 +1821,8 @@ function downloadBlob(blob, filename) {
 }
 
 function saveProject() {
+  lastSavedRoute = cloneRoute();
+  updateRouteHistoryControls();
   downloadBlob(
     new Blob([JSON.stringify(serializeProject(), null, 2)], { type: "application/json" }),
     `${safeFilename(project.name)}.plainmap.json`
@@ -1528,6 +1837,9 @@ async function loadProjectFile(file) {
   try {
     const data = JSON.parse(await file.text());
     project = mergeProjectDefaults(data.properties?.plainmapProject || data);
+    lastSavedRoute = cloneRoute(project.route);
+    routeUndoStack = [];
+    routeRedoStack = [];
     expandedPoiIds.clear();
     clearRouteEditHandles();
     syncUiFromProject();
@@ -1551,13 +1863,18 @@ function mergeProjectDefaults(data) {
   return {
     ...structuredClone(DEFAULT_PROJECT),
     ...data,
-    version: 3,
+    version: 4,
     poi_marker_mode: data.poi_marker_mode || "letters",
     poi_simple_markers: data.poi_simple_markers === true,
+    workflow_stage: Math.max(0, Math.min(7, Number(data.workflow_stage || 0))),
+    quick_edit_mode: data.quick_edit_mode === true,
     pois: (data.pois || []).map((poi) => ({
       ...poi,
       icon: normalizeMaterialIcon(poi.icon),
       show_label: poi.show_label !== false,
+      display_mode: poi.display_mode || "auto",
+      short_text: poi.short_text || "",
+      use_category_defaults: poi.use_category_defaults === true,
     })),
     palette: { ...AUSTIN_PALETTE, ...data.palette },
     compass: { ...DEFAULT_PROJECT.compass, ...data.compass },
@@ -1572,6 +1889,15 @@ function mergeProjectDefaults(data) {
       ...boundaryData,
       center: { ...DEFAULT_PROJECT.export_boundary.center, ...boundaryData.center },
     },
+    imported_layers: data.imported_layers?.length ? data.imported_layers : (
+      data.imported_features?.features?.length ? [{
+        id: uuid(),
+        name: "Legacy import",
+        visible: true,
+        locked: true,
+        data: data.imported_features,
+      }] : []
+    ),
   };
 }
 
@@ -1680,7 +2006,11 @@ function syncUiFromProject() {
   el("compass-position").value = project.compass.position;
   el("compass-size").value = project.compass.size;
   el("compass-color").value = project.compass.color;
+  el("compass-locked").checked = project.compass.locked;
+  el("compass-snap").checked = project.compass.snap;
   el("legend-visible").checked = project.legend.visible;
+  el("legend-locked").checked = project.legend.locked;
+  el("legend-snap").checked = project.legend.snap;
   el("export-preset").value = project.export.preset;
   el("export-width").value = project.export.width;
   el("export-height").value = project.export.height;
@@ -1689,6 +2019,8 @@ function syncUiFromProject() {
   el("boundary-lock-aspect").checked = project.export_boundary.lock_aspect;
   renderPaletteControls();
   renderLegendControls();
+  renderWorkflow();
+  updateRouteHistoryControls();
 }
 
 function renderAll() {
@@ -1715,7 +2047,16 @@ function bindEvents() {
     map.flyTo({ center: [Number(button.dataset.lng), Number(button.dataset.lat)], zoom: 16 });
     el("geocode-results").innerHTML = "";
   });
-  el("data-upload").addEventListener("change", (event) => event.target.files[0] && uploadMapData(event.target.files[0]));
+  el("data-upload").addEventListener("change", (event) => {
+    pendingImportFile = event.target.files[0] || null;
+    if (pendingImportFile) el("import-options-dialog").showModal();
+  });
+  el("confirm-import").addEventListener("click", () => {
+    const mode = document.querySelector('input[name="import-mode"]:checked').value;
+    if (pendingImportFile) uploadMapData(pendingImportFile, mode);
+    pendingImportFile = null;
+    el("data-upload").value = "";
+  });
   el("zoom-in").addEventListener("click", () => setMapZoom(map.getZoom() + 1));
   el("zoom-out").addEventListener("click", () => setMapZoom(map.getZoom() - 1));
   el("zoom-number").addEventListener("change", (event) => setMapZoom(event.target.value));
@@ -1762,13 +2103,29 @@ function bindEvents() {
     deleteRouteVertex(selectedRouteVertex);
   });
   el("reverse-route").addEventListener("click", () => {
+    recordRouteState();
     project.route.reverse();
     project.pois.reverse();
     renderPois();
     renderRoute();
   });
   el("clear-route").addEventListener("click", () => {
+    recordRouteState();
     project.route = [];
+    clearRouteEditHandles();
+    renderRoute();
+  });
+  el("undo-route").addEventListener("click", undoRoute);
+  el("redo-route").addEventListener("click", redoRoute);
+  el("revert-route").addEventListener("click", () => {
+    recordRouteState();
+    restoreRoute(lastSavedRoute);
+  });
+  el("reset-route").addEventListener("click", () => {
+    recordRouteState();
+    project.route_mode = "straight";
+    el("route-mode").value = "straight";
+    project.route = project.pois.filter((poi) => poi.selected).map((poi) => ({ ...poi.position }));
     clearRouteEditHandles();
     renderRoute();
   });
@@ -1802,10 +2159,18 @@ function bindEvents() {
   el("fit-route").addEventListener("click", () => fitRoute(true));
   el("reset-rotation").addEventListener("click", () => setRotation(0, "north"));
   el("compass-visible").addEventListener("change", (event) => { project.compass.visible = event.target.checked; renderCompass(); });
-  el("compass-position").addEventListener("change", (event) => { project.compass.position = event.target.value; renderCompass(); });
+  el("compass-position").addEventListener("change", (event) => {
+    project.compass.position = event.target.value;
+    project.compass.custom_position = {};
+    renderCompass();
+  });
   el("compass-size").addEventListener("input", (event) => { project.compass.size = Number(event.target.value); renderCompass(); });
   el("compass-color").addEventListener("input", (event) => { project.compass.color = event.target.value; renderCompass(); });
+  el("compass-locked").addEventListener("change", (event) => { project.compass.locked = event.target.checked; renderCompass(); });
+  el("compass-snap").addEventListener("change", (event) => { project.compass.snap = event.target.checked; });
   el("legend-visible").addEventListener("change", (event) => { project.legend.visible = event.target.checked; renderLegend(); });
+  el("legend-locked").addEventListener("change", (event) => { project.legend.locked = event.target.checked; renderLegend(); });
+  el("legend-snap").addEventListener("change", (event) => { project.legend.snap = event.target.checked; });
   el("legend-toggles").addEventListener("change", (event) => {
     project.legend.items[event.target.dataset.legendItem] = event.target.checked;
     renderLegend();
@@ -1839,8 +2204,19 @@ function bindEvents() {
   document.querySelectorAll("[data-export]").forEach((button) => button.addEventListener("click", () => exportProject(button.dataset.export)));
   el("save-project").addEventListener("click", saveProject);
   el("load-project").addEventListener("change", (event) => event.target.files[0] && loadProjectFile(event.target.files[0]));
+  el("previous-stage").addEventListener("click", () => setWorkflowStage(project.workflow_stage - 1));
+  el("next-stage").addEventListener("click", () => setWorkflowStage(project.workflow_stage + 1));
+  el("quick-edit-mode").addEventListener("change", (event) => {
+    project.quick_edit_mode = event.target.checked;
+    renderWorkflow();
+  });
+  el("workflow-steps").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-workflow-stage]");
+    if (button && !button.disabled) setWorkflowStage(button.dataset.workflowStage);
+  });
   bindPoiList();
   bindParkingList();
+  bindImportLayers();
 }
 
 function start() {
@@ -1848,6 +2224,8 @@ function start() {
   initMap();
   bindEvents();
   makeLegendDraggable();
+  makeCompassDraggable();
+  renderWorkflow();
   bindExportBoundary();
 }
 
