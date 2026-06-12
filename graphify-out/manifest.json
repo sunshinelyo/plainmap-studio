@@ -20,8 +20,8 @@
     "semantic_hash": ""
   },
   "frontend/app.js": {
-    "mtime": 1781233335.0376053,
-    "ast_hash": "e671fdda03aa40f8cfa752ac1441415f",
+    "mtime": 1781234727.5684183,
+    "ast_hash": "07ec290e51d63ac18a342ffd0271bb57",
     "semantic_hash": ""
   },
   "sample_data/austin_photo_walk.plainmap.json": {
@@ -90,8 +90,8 @@
     "semantic_hash": ""
   },
   "frontend/index.html": {
-    "mtime": 1781233324.7892115,
-    "ast_hash": "477cd856bd5d0b649295799590af9c07",
+    "mtime": 1781234816.0054643,
+    "ast_hash": "796203c84009d17e0e6f8527c6a835ac",
     "semantic_hash": ""
   },
   "requirements.txt": {

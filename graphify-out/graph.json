@@ -30,7 +30,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_file_import",
-      "community": 2,
+      "community": 0,
       "norm_label": "file_import.py"
     },
     {
@@ -40,7 +40,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "backend_file_import_parse_upload",
-      "community": 1,
+      "community": 0,
       "norm_label": "parse_upload()"
     },
     {
@@ -50,7 +50,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "any",
-      "community": 1,
+      "community": 0,
       "norm_label": "any"
     },
     {
@@ -60,7 +60,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "backend_file_import_parse_kmz",
-      "community": 1,
+      "community": 0,
       "norm_label": "parse_kmz()"
     },
     {
@@ -70,7 +70,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "backend_file_import_parse_kml",
-      "community": 1,
+      "community": 0,
       "norm_label": "parse_kml()"
     },
     {
@@ -80,7 +80,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "backend_file_import_local_name",
-      "community": 2,
+      "community": 0,
       "norm_label": "local_name()"
     },
     {
@@ -90,7 +90,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "backend_file_import_elements_named",
-      "community": 2,
+      "community": 0,
       "norm_label": "elements_named()"
     },
     {
@@ -100,7 +100,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "element",
-      "community": 2,
+      "community": 0,
       "norm_label": "element"
     },
     {
@@ -110,7 +110,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "backend_file_import_first_descendant",
-      "community": 2,
+      "community": 0,
       "norm_label": "first_descendant()"
     },
     {
@@ -120,7 +120,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "backend_file_import_element_text",
-      "community": 2,
+      "community": 0,
       "norm_label": "element_text()"
     },
     {
@@ -130,7 +130,7 @@
       "source_location": "L89",
       "_origin": "ast",
       "id": "backend_file_import_geometry_coordinates",
-      "community": 2,
+      "community": 0,
       "norm_label": "geometry_coordinates()"
     },
     {
@@ -140,7 +140,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "backend_file_import_track_coordinates",
-      "community": 2,
+      "community": 0,
       "norm_label": "track_coordinates()"
     },
     {
@@ -150,7 +150,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "backend_file_import_polygon_coordinates",
-      "community": 2,
+      "community": 0,
       "norm_label": "polygon_coordinates()"
     },
     {
@@ -160,7 +160,7 @@
       "source_location": "L131",
       "_origin": "ast",
       "id": "backend_file_import_valid_polygon_ring",
-      "community": 2,
+      "community": 0,
       "norm_label": "valid_polygon_ring()"
     },
     {
@@ -170,7 +170,7 @@
       "source_location": "L135",
       "_origin": "ast",
       "id": "backend_file_import_close_polygon_ring",
-      "community": 2,
+      "community": 0,
       "norm_label": "close_polygon_ring()"
     },
     {
@@ -180,7 +180,7 @@
       "source_location": "L141",
       "_origin": "ast",
       "id": "backend_file_import_feature",
-      "community": 1,
+      "community": 0,
       "norm_label": "feature()"
     },
     {
@@ -190,7 +190,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_main",
-      "community": 5,
+      "community": 4,
       "norm_label": "main.py"
     },
     {
@@ -200,7 +200,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "backend_main_disable_local_cache",
-      "community": 5,
+      "community": 4,
       "norm_label": "disable_local_cache()"
     },
     {
@@ -210,7 +210,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "backend_main_health",
-      "community": 5,
+      "community": 4,
       "norm_label": "health()"
     },
     {
@@ -220,7 +220,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "backend_main_import_file",
-      "community": 5,
+      "community": 4,
       "norm_label": "import_file()"
     },
     {
@@ -230,7 +230,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "uploadfile",
-      "community": 5,
+      "community": 4,
       "norm_label": "uploadfile"
     },
     {
@@ -240,7 +240,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "backend_main_index",
-      "community": 5,
+      "community": 4,
       "norm_label": "index()"
     },
     {
@@ -250,7 +250,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "htmlresponse",
-      "community": 5,
+      "community": 4,
       "norm_label": "htmlresponse"
     },
     {
@@ -260,7 +260,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_app",
-      "community": 0,
+      "community": 2,
       "norm_label": "app.js"
     },
     {
@@ -270,467 +270,547 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_app_state",
-      "community": 0,
+      "community": 2,
       "norm_label": "state"
     },
     {
       "label": "FRAME_INSET",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L18",
+      "source_location": "L21",
       "_origin": "ast",
       "id": "frontend_app_frame_inset",
-      "community": 0,
+      "community": 2,
       "norm_label": "frame_inset"
     },
     {
       "label": "elements",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L20",
+      "source_location": "L23",
       "_origin": "ast",
       "id": "frontend_app_elements",
-      "community": 0,
+      "community": 2,
       "norm_label": "elements"
     },
     {
       "label": "map",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L48",
+      "source_location": "L55",
       "_origin": "ast",
       "id": "frontend_app_map",
-      "community": 0,
+      "community": 2,
       "norm_label": "map"
     },
     {
       "label": "importFile()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L206",
+      "source_location": "L250",
       "_origin": "ast",
       "id": "frontend_app_importfile",
-      "community": 4,
+      "community": 9,
       "norm_label": "importfile()"
     },
     {
       "label": "emptyCollection()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L289",
+      "source_location": "L346",
       "_origin": "ast",
       "id": "frontend_app_emptycollection",
-      "community": 0,
+      "community": 2,
       "norm_label": "emptycollection()"
     },
     {
       "label": "pointFeature()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L293",
+      "source_location": "L350",
       "_origin": "ast",
       "id": "frontend_app_pointfeature",
-      "community": 3,
+      "community": 1,
       "norm_label": "pointfeature()"
     },
     {
       "label": "loadFeatures()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L304",
+      "source_location": "L361",
       "_origin": "ast",
       "id": "frontend_app_loadfeatures",
-      "community": 4,
+      "community": 9,
       "norm_label": "loadfeatures()"
     },
     {
       "label": "setMode()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L331",
+      "source_location": "L394",
       "_origin": "ast",
       "id": "frontend_app_setmode",
-      "community": 4,
+      "community": 1,
       "norm_label": "setmode()"
     },
     {
       "label": "finishDrawing()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L344",
+      "source_location": "L420",
       "_origin": "ast",
       "id": "frontend_app_finishdrawing",
-      "community": 4,
+      "community": 1,
       "norm_label": "finishdrawing()"
     },
     {
       "label": "renderAll()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L354",
+      "source_location": "L430",
       "_origin": "ast",
       "id": "frontend_app_renderall",
-      "community": 4,
+      "community": 9,
       "norm_label": "renderall()"
     },
     {
       "label": "renderParking()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L360",
+      "source_location": "L436",
       "_origin": "ast",
       "id": "frontend_app_renderparking",
-      "community": 4,
+      "community": 6,
       "norm_label": "renderparking()"
+    },
+    {
+      "label": "updateParkingOverlay()",
+      "file_type": "code",
+      "source_file": "frontend/app.js",
+      "source_location": "L472",
+      "_origin": "ast",
+      "id": "frontend_app_updateparkingoverlay",
+      "community": 7,
+      "norm_label": "updateparkingoverlay()"
+    },
+    {
+      "label": "renderParkingList()",
+      "file_type": "code",
+      "source_file": "frontend/app.js",
+      "source_location": "L490",
+      "_origin": "ast",
+      "id": "frontend_app_renderparkinglist",
+      "community": 6,
+      "norm_label": "renderparkinglist()"
+    },
+    {
+      "label": "renderParkingMapData()",
+      "file_type": "code",
+      "source_file": "frontend/app.js",
+      "source_location": "L554",
+      "_origin": "ast",
+      "id": "frontend_app_renderparkingmapdata",
+      "community": 6,
+      "norm_label": "renderparkingmapdata()"
+    },
+    {
+      "label": "selectParking()",
+      "file_type": "code",
+      "source_file": "frontend/app.js",
+      "source_location": "L572",
+      "_origin": "ast",
+      "id": "frontend_app_selectparking",
+      "community": 6,
+      "norm_label": "selectparking()"
+    },
+    {
+      "label": "deleteParking()",
+      "file_type": "code",
+      "source_file": "frontend/app.js",
+      "source_location": "L579",
+      "_origin": "ast",
+      "id": "frontend_app_deleteparking",
+      "community": 1,
+      "norm_label": "deleteparking()"
+    },
+    {
+      "label": "finishParkingDrawing()",
+      "file_type": "code",
+      "source_file": "frontend/app.js",
+      "source_location": "L590",
+      "_origin": "ast",
+      "id": "frontend_app_finishparkingdrawing",
+      "community": 1,
+      "norm_label": "finishparkingdrawing()"
+    },
+    {
+      "label": "cancelParkingDrawing()",
+      "file_type": "code",
+      "source_file": "frontend/app.js",
+      "source_location": "L608",
+      "_origin": "ast",
+      "id": "frontend_app_cancelparkingdrawing",
+      "community": 1,
+      "norm_label": "cancelparkingdrawing()"
+    },
+    {
+      "label": "renderParkingMarkers()",
+      "file_type": "code",
+      "source_file": "frontend/app.js",
+      "source_location": "L614",
+      "_origin": "ast",
+      "id": "frontend_app_renderparkingmarkers",
+      "community": 6,
+      "norm_label": "renderparkingmarkers()"
     },
     {
       "label": "renderPois()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L371",
+      "source_location": "L650",
       "_origin": "ast",
       "id": "frontend_app_renderpois",
-      "community": 3,
+      "community": 1,
       "norm_label": "renderpois()"
     },
     {
       "label": "renderPoiOverlay()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L390",
+      "source_location": "L669",
       "_origin": "ast",
       "id": "frontend_app_renderpoioverlay",
-      "community": 3,
+      "community": 1,
       "norm_label": "renderpoioverlay()"
     },
     {
       "label": "positionPoiOverlay()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L425",
+      "source_location": "L704",
       "_origin": "ast",
       "id": "frontend_app_positionpoioverlay",
-      "community": 8,
+      "community": 2,
       "norm_label": "positionpoioverlay()"
     },
     {
       "label": "updateOverlays()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L434",
+      "source_location": "L713",
       "_origin": "ast",
       "id": "frontend_app_updateoverlays",
-      "community": 8,
+      "community": 7,
       "norm_label": "updateoverlays()"
     },
     {
       "label": "startPoiDrag()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L439",
+      "source_location": "L719",
       "_origin": "ast",
       "id": "frontend_app_startpoidrag",
-      "community": 0,
+      "community": 2,
       "norm_label": "startpoidrag()"
     },
     {
       "label": "movePoiDrag()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L451",
+      "source_location": "L731",
       "_origin": "ast",
       "id": "frontend_app_movepoidrag",
-      "community": 8,
+      "community": 2,
       "norm_label": "movepoidrag()"
     },
     {
       "label": "endPoiDrag()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L463",
+      "source_location": "L743",
       "_origin": "ast",
       "id": "frontend_app_endpoidrag",
-      "community": 3,
+      "community": 1,
       "norm_label": "endpoidrag()"
     },
     {
       "label": "addPoiAt()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L473",
+      "source_location": "L753",
       "_origin": "ast",
       "id": "frontend_app_addpoiat",
-      "community": 3,
+      "community": 1,
       "norm_label": "addpoiat()"
     },
     {
       "label": "renderPoiList()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L482",
+      "source_location": "L762",
       "_origin": "ast",
       "id": "frontend_app_renderpoilist",
-      "community": 3,
+      "community": 1,
       "norm_label": "renderpoilist()"
     },
     {
       "label": "coordinateInput()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L573",
+      "source_location": "L853",
       "_origin": "ast",
       "id": "frontend_app_coordinateinput",
-      "community": 0,
+      "community": 2,
       "norm_label": "coordinateinput()"
     },
     {
       "label": "updatePoiMapData()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L586",
+      "source_location": "L866",
       "_origin": "ast",
       "id": "frontend_app_updatepoimapdata",
-      "community": 8,
+      "community": 2,
       "norm_label": "updatepoimapdata()"
     },
     {
       "label": "selectPoi()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L606",
+      "source_location": "L886",
       "_origin": "ast",
       "id": "frontend_app_selectpoi",
-      "community": 3,
+      "community": 1,
       "norm_label": "selectpoi()"
     },
     {
       "label": "deletePoi()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L622",
+      "source_location": "L902",
       "_origin": "ast",
       "id": "frontend_app_deletepoi",
-      "community": 3,
+      "community": 1,
       "norm_label": "deletepoi()"
     },
     {
       "label": "renderRoute()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L630",
+      "source_location": "L910",
       "_origin": "ast",
       "id": "frontend_app_renderroute",
-      "community": 4,
+      "community": 7,
       "norm_label": "renderroute()"
     },
     {
       "label": "updateRouteOverlay()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L655",
+      "source_location": "L935",
       "_origin": "ast",
       "id": "frontend_app_updaterouteoverlay",
-      "community": 8,
+      "community": 7,
       "norm_label": "updaterouteoverlay()"
     },
     {
       "label": "renderRouteMarkers()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L666",
+      "source_location": "L946",
       "_origin": "ast",
       "id": "frontend_app_renderroutemarkers",
-      "community": 4,
+      "community": 7,
       "norm_label": "renderroutemarkers()"
     },
     {
       "label": "visiblePoiCoordinates()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L696",
+      "source_location": "L976",
       "_origin": "ast",
       "id": "frontend_app_visiblepoicoordinates",
-      "community": 0,
+      "community": 5,
       "norm_label": "visiblepoicoordinates()"
     },
     {
       "label": "parkingCoordinates()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L702",
+      "source_location": "L982",
       "_origin": "ast",
       "id": "frontend_app_parkingcoordinates",
-      "community": 0,
+      "community": 5,
       "norm_label": "parkingcoordinates()"
     },
     {
       "label": "fitContent()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L706",
+      "source_location": "L988",
       "_origin": "ast",
       "id": "frontend_app_fitcontent",
-      "community": 0,
+      "community": 5,
       "norm_label": "fitcontent()"
     },
     {
       "label": "bestFrameCamera()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L734",
+      "source_location": "L1016",
       "_origin": "ast",
       "id": "frontend_app_bestframecamera",
-      "community": 0,
+      "community": 5,
       "norm_label": "bestframecamera()"
     },
     {
       "label": "exportFramePadding()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L789",
+      "source_location": "L1071",
       "_origin": "ast",
       "id": "frontend_app_exportframepadding",
-      "community": 0,
+      "community": 5,
       "norm_label": "exportframepadding()"
     },
     {
       "label": "updateFrameShape()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L800",
+      "source_location": "L1082",
       "_origin": "ast",
       "id": "frontend_app_updateframeshape",
-      "community": 0,
+      "community": 2,
       "norm_label": "updateframeshape()"
     },
     {
       "label": "exportPng()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L816",
+      "source_location": "L1098",
       "_origin": "ast",
       "id": "frontend_app_exportpng",
-      "community": 7,
+      "community": 1,
       "norm_label": "exportpng()"
     },
     {
       "label": "drawExportDecorations()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L851",
+      "source_location": "L1133",
       "_origin": "ast",
       "id": "frontend_app_drawexportdecorations",
-      "community": 7,
+      "community": 3,
       "norm_label": "drawexportdecorations()"
     },
     {
       "label": "drawCompass()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L871",
+      "source_location": "L1153",
       "_origin": "ast",
       "id": "frontend_app_drawcompass",
-      "community": 7,
+      "community": 3,
       "norm_label": "drawcompass()"
     },
     {
       "label": "legendItems()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L904",
+      "source_location": "L1186",
       "_origin": "ast",
       "id": "frontend_app_legenditems",
-      "community": 6,
+      "community": 3,
       "norm_label": "legenditems()"
     },
     {
       "label": "drawLegend()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L923",
+      "source_location": "L1205",
       "_origin": "ast",
       "id": "frontend_app_drawlegend",
-      "community": 6,
+      "community": 3,
       "norm_label": "drawlegend()"
     },
     {
       "label": "drawLegendText()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L1029",
+      "source_location": "L1311",
       "_origin": "ast",
       "id": "frontend_app_drawlegendtext",
-      "community": 6,
+      "community": 3,
       "norm_label": "drawlegendtext()"
     },
     {
       "label": "createLegendCanvas()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L1042",
+      "source_location": "L1324",
       "_origin": "ast",
       "id": "frontend_app_createlegendcanvas",
-      "community": 6,
+      "community": 3,
       "norm_label": "createlegendcanvas()"
     },
     {
       "label": "downloadCanvas()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L1061",
+      "source_location": "L1343",
       "_origin": "ast",
       "id": "frontend_app_downloadcanvas",
-      "community": 7,
+      "community": 1,
       "norm_label": "downloadcanvas()"
     },
     {
       "label": "drawExportFeatures()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L1072",
+      "source_location": "L1354",
       "_origin": "ast",
       "id": "frontend_app_drawexportfeatures",
-      "community": 7,
+      "community": 1,
       "norm_label": "drawexportfeatures()"
     },
     {
       "label": "drawExportPin()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L1112",
+      "source_location": "L1415",
       "_origin": "ast",
       "id": "frontend_app_drawexportpin",
-      "community": 6,
+      "community": 3,
       "norm_label": "drawexportpin()"
     },
     {
       "label": "roundedRect()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L1173",
+      "source_location": "L1476",
       "_origin": "ast",
       "id": "frontend_app_roundedrect",
-      "community": 6,
+      "community": 3,
       "norm_label": "roundedrect()"
     },
     {
       "label": "waitForMap()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L1184",
+      "source_location": "L1487",
       "_origin": "ast",
       "id": "frontend_app_waitformap",
-      "community": 7,
+      "community": 1,
       "norm_label": "waitformap()"
     },
     {
       "label": "setMessage()",
       "file_type": "code",
       "source_file": "frontend/app.js",
-      "source_location": "L1198",
+      "source_location": "L1501",
       "_origin": "ast",
       "id": "frontend_app_setmessage",
-      "community": 3,
+      "community": 1,
       "norm_label": "setmessage()"
     },
     {
@@ -740,7 +820,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_file_import",
-      "community": 1,
+      "community": 0,
       "norm_label": "test_file_import.py"
     },
     {
@@ -750,7 +830,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "tests_test_file_import_test_parse_kml_returns_points_and_one_line",
-      "community": 1,
+      "community": 0,
       "norm_label": "test_parse_kml_returns_points_and_one_line()"
     },
     {
@@ -760,7 +840,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "tests_test_file_import_test_parse_kmz_prefers_doc_kml",
-      "community": 1,
+      "community": 0,
       "norm_label": "test_parse_kmz_prefers_doc_kml()"
     },
     {
@@ -770,7 +850,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "tests_test_file_import_test_rejects_unsupported_uploads",
-      "community": 1,
+      "community": 0,
       "norm_label": "test_rejects_unsupported_uploads()"
     },
     {
@@ -780,7 +860,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "tests_test_file_import_test_parse_multi_geometry_and_gx_track",
-      "community": 1,
+      "community": 0,
       "norm_label": "test_parse_multi_geometry_and_gx_track()"
     },
     {
@@ -790,7 +870,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "tests_test_file_import_test_parse_parking_polygon_with_inner_ring",
-      "community": 1,
+      "community": 0,
       "norm_label": "test_parse_parking_polygon_with_inner_ring()"
     },
     {
@@ -800,7 +880,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "tests_test_file_import_test_kml_without_supported_features_is_rejected",
-      "community": 1,
+      "community": 0,
       "norm_label": "test_kml_without_supported_features_is_rejected()"
     },
     {
@@ -810,7 +890,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "readme",
-      "community": 9,
+      "community": 8,
       "norm_label": "readme.md"
     },
     {
@@ -820,7 +900,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "readme_plainmap_studio",
-      "community": 9,
+      "community": 8,
       "norm_label": "plainmap studio"
     },
     {
@@ -830,7 +910,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "readme_first_version",
-      "community": 9,
+      "community": 8,
       "norm_label": "first version"
     },
     {
@@ -840,7 +920,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "readme_run_locally",
-      "community": 9,
+      "community": 8,
       "norm_label": "run locally"
     }
   ],
@@ -861,9 +941,9 @@
       "source_file": "backend/file_import.py",
       "source_location": "L135",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "backend_file_import",
-      "target": "backend_file_import_close_polygon_ring",
-      "confidence_score": 1.0
+      "target": "backend_file_import_close_polygon_ring"
     },
     {
       "relation": "contains",
@@ -961,9 +1041,9 @@
       "source_file": "backend/file_import.py",
       "source_location": "L116",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "backend_file_import",
-      "target": "backend_file_import_polygon_coordinates",
-      "confidence_score": 1.0
+      "target": "backend_file_import_polygon_coordinates"
     },
     {
       "relation": "contains",
@@ -981,9 +1061,9 @@
       "source_file": "backend/file_import.py",
       "source_location": "L131",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "backend_file_import",
-      "target": "backend_file_import_valid_polygon_ring",
-      "confidence_score": 1.0
+      "target": "backend_file_import_valid_polygon_ring"
     },
     {
       "relation": "imports_from",
@@ -1190,9 +1270,9 @@
       "source_file": "backend/file_import.py",
       "source_location": "L60",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "backend_file_import_parse_kml",
-      "target": "backend_file_import_polygon_coordinates",
-      "confidence_score": 1.0
+      "target": "backend_file_import_polygon_coordinates"
     },
     {
       "relation": "calls",
@@ -1256,9 +1336,9 @@
       "source_file": "tests/test_file_import.py",
       "source_location": "L74",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "tests_test_file_import_test_parse_parking_polygon_with_inner_ring",
-      "target": "backend_file_import_parse_kml",
-      "confidence_score": 1.0
+      "target": "backend_file_import_parse_kml"
     },
     {
       "relation": "calls",
@@ -1300,9 +1380,9 @@
       "source_file": "backend/file_import.py",
       "source_location": "L124",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "backend_file_import_polygon_coordinates",
-      "target": "backend_file_import_elements_named",
-      "confidence_score": 1.0
+      "target": "backend_file_import_elements_named"
     },
     {
       "relation": "calls",
@@ -1355,9 +1435,9 @@
       "source_file": "backend/file_import.py",
       "source_location": "L116",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "backend_file_import_polygon_coordinates",
-      "target": "element",
-      "confidence_score": 1.0
+      "target": "element"
     },
     {
       "relation": "references",
@@ -1388,9 +1468,9 @@
       "source_file": "backend/file_import.py",
       "source_location": "L118",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "backend_file_import_polygon_coordinates",
-      "target": "backend_file_import_first_descendant",
-      "confidence_score": 1.0
+      "target": "backend_file_import_first_descendant"
     },
     {
       "relation": "calls",
@@ -1410,9 +1490,9 @@
       "source_file": "backend/file_import.py",
       "source_location": "L120",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "backend_file_import_polygon_coordinates",
-      "target": "backend_file_import_geometry_coordinates",
-      "confidence_score": 1.0
+      "target": "backend_file_import_geometry_coordinates"
     },
     {
       "relation": "calls",
@@ -1421,9 +1501,9 @@
       "source_file": "backend/file_import.py",
       "source_location": "L122",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "backend_file_import_polygon_coordinates",
-      "target": "backend_file_import_close_polygon_ring",
-      "confidence_score": 1.0
+      "target": "backend_file_import_close_polygon_ring"
     },
     {
       "relation": "calls",
@@ -1432,9 +1512,9 @@
       "source_file": "backend/file_import.py",
       "source_location": "L121",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "backend_file_import_polygon_coordinates",
-      "target": "backend_file_import_valid_polygon_ring",
-      "confidence_score": 1.0
+      "target": "backend_file_import_valid_polygon_ring"
     },
     {
       "relation": "contains",
@@ -1522,6 +1602,16 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "frontend/app.js",
+      "source_location": "L608",
+      "weight": 1.0,
+      "source": "frontend_app",
+      "target": "frontend_app_cancelparkingdrawing",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
       "source_location": "L525",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -1537,6 +1627,16 @@
       "confidence_score": 1.0,
       "source": "frontend_app",
       "target": "frontend_app_createlegendcanvas"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L579",
+      "weight": 1.0,
+      "source": "frontend_app",
+      "target": "frontend_app_deleteparking",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -1682,6 +1782,16 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "frontend/app.js",
+      "source_location": "L590",
+      "weight": 1.0,
+      "source": "frontend_app",
+      "target": "frontend_app_finishparkingdrawing",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
       "source_location": "L654",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -1754,9 +1864,9 @@
       "source_file": "frontend/app.js",
       "source_location": "L702",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_app",
-      "target": "frontend_app_parkingcoordinates",
-      "confidence_score": 1.0
+      "target": "frontend_app_parkingcoordinates"
     },
     {
       "relation": "contains",
@@ -1794,8 +1904,38 @@
       "source_file": "frontend/app.js",
       "source_location": "L360",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_app",
-      "target": "frontend_app_renderparking",
+      "target": "frontend_app_renderparking"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L490",
+      "weight": 1.0,
+      "source": "frontend_app",
+      "target": "frontend_app_renderparkinglist",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L554",
+      "weight": 1.0,
+      "source": "frontend_app",
+      "target": "frontend_app_renderparkingmapdata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L614",
+      "weight": 1.0,
+      "source": "frontend_app",
+      "target": "frontend_app_renderparkingmarkers",
       "confidence_score": 1.0
     },
     {
@@ -1857,6 +1997,16 @@
       "confidence_score": 1.0,
       "source": "frontend_app",
       "target": "frontend_app_roundedrect"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L572",
+      "weight": 1.0,
+      "source": "frontend_app",
+      "target": "frontend_app_selectparking",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -1927,6 +2077,16 @@
       "confidence_score": 1.0,
       "source": "frontend_app",
       "target": "frontend_app_updateoverlays"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L472",
+      "weight": 1.0,
+      "source": "frontend_app",
+      "target": "frontend_app_updateparkingoverlay",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -2039,6 +2199,28 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "frontend/app.js",
+      "source_location": "L610",
+      "weight": 1.0,
+      "source": "frontend_app_cancelparkingdrawing",
+      "target": "frontend_app_setmode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L585",
+      "weight": 1.0,
+      "source": "frontend_app_deleteparking",
+      "target": "frontend_app_setmode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
       "source_location": "L765",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -2055,6 +2237,28 @@
       "confidence_score": 1.0,
       "source": "frontend_app_finishdrawing",
       "target": "frontend_app_setmode"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L604",
+      "weight": 1.0,
+      "source": "frontend_app_finishparkingdrawing",
+      "target": "frontend_app_setmode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L417",
+      "weight": 1.0,
+      "source": "frontend_app_setmode",
+      "target": "frontend_app_renderparking",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -2085,9 +2289,9 @@
       "source_file": "frontend/app.js",
       "source_location": "L355",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_app_renderall",
-      "target": "frontend_app_renderparking",
-      "confidence_score": 1.0
+      "target": "frontend_app_renderparking"
     },
     {
       "relation": "calls",
@@ -2110,6 +2314,127 @@
       "confidence_score": 1.0,
       "source": "frontend_app_renderall",
       "target": "frontend_app_renderroute"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L586",
+      "weight": 1.0,
+      "source": "frontend_app_deleteparking",
+      "target": "frontend_app_renderparking",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L468",
+      "weight": 1.0,
+      "source": "frontend_app_renderparking",
+      "target": "frontend_app_renderparkinglist",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L469",
+      "weight": 1.0,
+      "source": "frontend_app_renderparking",
+      "target": "frontend_app_renderparkingmarkers",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L467",
+      "weight": 1.0,
+      "source": "frontend_app_renderparking",
+      "target": "frontend_app_updateparkingoverlay",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L574",
+      "weight": 1.0,
+      "source": "frontend_app_selectparking",
+      "target": "frontend_app_renderparking",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L714",
+      "weight": 1.0,
+      "source": "frontend_app_updateoverlays",
+      "target": "frontend_app_updateparkingoverlay",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L575",
+      "weight": 1.0,
+      "source": "frontend_app_selectparking",
+      "target": "frontend_app_renderparkingmapdata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L576",
+      "weight": 1.0,
+      "source": "frontend_app_selectparking",
+      "target": "frontend_app_setmessage",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L587",
+      "weight": 1.0,
+      "source": "frontend_app_deleteparking",
+      "target": "frontend_app_setmessage",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L593",
+      "weight": 1.0,
+      "source": "frontend_app_finishparkingdrawing",
+      "target": "frontend_app_setmessage",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/app.js",
+      "source_location": "L611",
+      "weight": 1.0,
+      "source": "frontend_app_cancelparkingdrawing",
+      "target": "frontend_app_setmessage",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -2327,9 +2652,9 @@
       "source_file": "frontend/app.js",
       "source_location": "L707",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_app_fitcontent",
-      "target": "frontend_app_parkingcoordinates",
-      "confidence_score": 1.0
+      "target": "frontend_app_parkingcoordinates"
     },
     {
       "relation": "calls",
@@ -2564,9 +2889,9 @@
       "source_file": "tests/test_file_import.py",
       "source_location": "L73",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "tests_test_file_import",
-      "target": "tests_test_file_import_test_parse_parking_polygon_with_inner_ring",
-      "confidence_score": 1.0
+      "target": "tests_test_file_import_test_parse_parking_polygon_with_inner_ring"
     },
     {
       "relation": "contains",
@@ -2610,5 +2935,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "89b1ff08d968b9a72cc96faf243d8f80b4c29824"
+  "built_at_commit": "e11cfc99627e93ed2af3ccdfa391cfada7a3fa19"
 }

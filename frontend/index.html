@@ -6,7 +6,7 @@
   <title>PlainMap Studio</title>
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="/assets/styles.css?v=14">
+  <link rel="stylesheet" href="/assets/styles.css?v=15">
 </head>
 <body>
   <main class="app-shell">
@@ -41,6 +41,15 @@
           <span>Hide all POI labels</span>
         </label>
         <div id="poi-list" class="poi-list" aria-label="Points of interest"></div>
+        <div class="subsection-heading">
+          <h3>Parking areas</h3>
+          <p>Draw, rename, show, edit, or remove parking polygons.</p>
+        </div>
+        <div class="button-row">
+          <button id="add-parking" class="secondary" type="button">Add parking area</button>
+          <button id="finish-parking" type="button" hidden>Finish area</button>
+        </div>
+        <div id="parking-list" class="parking-list" aria-label="Parking areas"></div>
       </section>
 
       <section>
@@ -112,6 +121,7 @@
 
     <section id="drop-zone" class="map-workspace" aria-label="Map editor">
       <div id="map"></div>
+      <svg id="parking-overlay" aria-hidden="true"></svg>
       <svg id="route-overlay" aria-hidden="true">
         <path id="route-overlay-outline"></path>
         <path id="route-overlay-line"></path>
@@ -126,6 +136,6 @@
   </main>
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <script src="/assets/app.js?v=23"></script>
+  <script src="/assets/app.js?v=24"></script>
 </body>
 </html>

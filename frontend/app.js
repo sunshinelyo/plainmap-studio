@@ -2,12 +2,15 @@ const state = {
   pois: [],
   route: [],
   parkingAreas: [],
+  parkingDraft: [],
   mode: "view",
   dragIndex: null,
   draggedPoi: null,
   selectedPoi: null,
+  selectedParking: null,
   hidePoiLabels: false,
   routeMarkers: [],
+  parkingMarkers: [],
   colors: {
     route: "#f05a3c",
     poi: "#14213d",
@@ -26,6 +29,9 @@ const elements = {
   addPoi: document.querySelector("#add-poi"),
   hidePoiLabels: document.querySelector("#hide-poi-labels"),
   poiList: document.querySelector("#poi-list"),
+  addParking: document.querySelector("#add-parking"),
+  finishParking: document.querySelector("#finish-parking"),
+  parkingList: document.querySelector("#parking-list"),
   drawRoute: document.querySelector("#draw-route"),
   editRoute: document.querySelector("#edit-route"),
   clearRoute: document.querySelector("#clear-route"),
@@ -40,6 +46,7 @@ const elements = {
   message: document.querySelector("#app-message"),
   dropZone: document.querySelector("#drop-zone"),
   mapTip: document.querySelector("#map-tip"),
+  parkingOverlay: document.querySelector("#parking-overlay"),
   routeOverlayLine: document.querySelector("#route-overlay-line"),
   routeOverlayOutline: document.querySelector("#route-overlay-outline"),
   poiOverlay: document.querySelector("#poi-overlay"),
@@ -75,14 +82,20 @@ map.on("load", () => {
   map.addSource("route-vertices", emptyCollection());
   map.addSource("pois", emptyCollection());
   map.addSource("parking", emptyCollection());
+  map.addSource("parking-draft", emptyCollection());
 
   map.addLayer({
     id: "parking-fill",
     type: "fill",
     source: "parking",
     paint: {
-      "fill-color": "#4f89c6",
-      "fill-opacity": 0.32,
+      "fill-color": [
+        "case",
+        ["boolean", ["get", "selected"], false],
+        "#ffd84d",
+        "#f4c542",
+      ],
+      "fill-opacity": 0.58,
     },
   });
   map.addLayer({
@@ -90,8 +103,19 @@ map.on("load", () => {
     type: "line",
     source: "parking",
     paint: {
-      "line-color": "#356da8",
-      "line-width": 2,
+      "line-color": "#8a6500",
+      "line-width": 3,
+      "line-dasharray": [2, 1.5],
+    },
+  });
+  map.addLayer({
+    id: "parking-draft",
+    type: "line",
+    source: "parking-draft",
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: {
+      "line-color": "#8a6500",
+      "line-width": 4,
       "line-dasharray": [2, 1.5],
     },
   });
@@ -131,6 +155,11 @@ map.on("click", (event) => {
   }
   if (state.mode === "add-poi") {
     addPoiAt([event.lngLat.lng, event.lngLat.lat]);
+    return;
+  }
+  if (state.mode === "draw-parking") {
+    state.parkingDraft.push([event.lngLat.lng, event.lngLat.lat]);
+    renderParking();
   }
 });
 
@@ -145,7 +174,22 @@ map.on("dblclick", (event) => {
     finishDrawing();
     return;
   }
-  if (state.mode === "edit" || state.mode === "add-poi") return;
+  if (state.mode === "draw-parking") {
+    const last = state.parkingDraft.at(-1);
+    const previous = state.parkingDraft.at(-2);
+    if (last && previous && last[0] === previous[0] && last[1] === previous[1]) {
+      state.parkingDraft.pop();
+    }
+    finishParkingDrawing();
+    return;
+  }
+  if (["edit", "add-poi", "edit-parking"].includes(state.mode)) return;
+});
+
+map.on("click", "parking-fill", (event) => {
+  if (state.mode !== "view" || !event.features?.length) return;
+  event.originalEvent.stopPropagation();
+  selectParking(Number(event.features[0].properties.index));
 });
 
 map.on("mousedown", "route-vertices", (event) => {
@@ -246,6 +290,19 @@ elements.addPoi.addEventListener("click", () => {
   setMessage(state.mode === "add-poi" ? "Click the map to place a POI" : "POI placement cancelled");
 });
 
+elements.addParking.addEventListener("click", () => {
+  if (state.mode === "draw-parking") {
+    cancelParkingDrawing();
+    return;
+  }
+  state.parkingDraft = [];
+  state.selectedParking = null;
+  setMode("draw-parking");
+  setMessage("Click around the parking area, then press Finish area");
+});
+
+elements.finishParking.addEventListener("click", finishParkingDrawing);
+
 elements.hidePoiLabels.addEventListener("change", () => {
   state.hidePoiLabels = elements.hidePoiLabels.checked;
   renderPoiOverlay();
@@ -313,8 +370,13 @@ function loadFeatures(features) {
   state.route = line ? line.geometry.coordinates.map((coordinate) => coordinate.slice(0, 2)) : [];
   state.parkingAreas = features
     .filter((feature) => feature.geometry?.type === "Polygon")
-    .map((feature) => ({
+    .map((feature, index) => ({
       ...feature,
+      properties: {
+        ...feature.properties,
+        label: feature.properties?.label || `Parking area ${index + 1}`,
+        visible: true,
+      },
       geometry: {
         ...feature.geometry,
         coordinates: feature.geometry.coordinates.map((ring) => (
@@ -323,6 +385,7 @@ function loadFeatures(features) {
       },
     }));
   state.selectedPoi = state.pois.length ? 0 : null;
+  state.selectedParking = state.parkingAreas.length ? 0 : null;
   setMode("view");
   renderAll();
   fitContent();
@@ -334,11 +397,24 @@ function setMode(mode) {
   elements.drawRoute.textContent = mode === "draw" ? "Finish path" : "Draw path";
   elements.editRoute.textContent = mode === "edit" ? "Done editing" : "Edit path";
   elements.addPoi.textContent = mode === "add-poi" ? "Cancel adding POI" : "Add POI on map";
-  elements.mapTip.textContent = mode === "add-poi"
-    ? "Click the map to place the new POI"
-    : "Choose Add POI, then click the map";
-  map.getCanvas().style.cursor = ["draw", "add-poi"].includes(mode) ? "crosshair" : "";
+  elements.addParking.textContent = mode === "draw-parking"
+    ? "Cancel adding parking"
+    : "Add parking area";
+  elements.finishParking.hidden = mode !== "draw-parking";
+  if (mode === "add-poi") {
+    elements.mapTip.textContent = "Click the map to place the new POI";
+  } else if (mode === "draw-parking") {
+    elements.mapTip.textContent = "Click around the parking area";
+  } else if (mode === "edit-parking") {
+    elements.mapTip.textContent = "Drag the yellow points to edit parking";
+  } else {
+    elements.mapTip.textContent = "Choose Add POI, then click the map";
+  }
+  map.getCanvas().style.cursor = ["draw", "add-poi", "draw-parking"].includes(mode)
+    ? "crosshair"
+    : "";
   renderRoute();
+  renderParking();
 }
 
 function finishDrawing() {
@@ -362,10 +438,213 @@ function renderParking() {
   if (source) {
     source.setData({
       type: "FeatureCollection",
-      features: state.parkingAreas,
+      features: state.parkingAreas
+        .map((feature, index) => ({
+          ...feature,
+          properties: {
+            ...feature.properties,
+            index,
+            selected: state.selectedParking === index,
+          },
+        }))
+        .filter((feature) => feature.properties.visible !== false),
+    });
+  }
+  const draftSource = map.getSource("parking-draft");
+  if (draftSource) {
+    draftSource.setData({
+      type: "FeatureCollection",
+      features: state.parkingDraft.length >= 2
+        ? [{
+          type: "Feature",
+          properties: {},
+          geometry: { type: "LineString", coordinates: state.parkingDraft },
+        }]
+        : [],
     });
   }
   elements.parkingCount.textContent = state.parkingAreas.length;
+  updateParkingOverlay();
+  renderParkingList();
+  renderParkingMarkers();
+}
+
+function updateParkingOverlay() {
+  elements.parkingOverlay.replaceChildren();
+  state.parkingAreas.forEach((area, index) => {
+    if (area.properties.visible === false) return;
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.classList.add("parking-overlay-shape");
+    if (state.selectedParking === index) path.classList.add("selected");
+    const commands = area.geometry.coordinates
+      .map((ring) => ring.map((coordinates, pointIndex) => {
+        const point = map.project(coordinates);
+        return `${pointIndex ? "L" : "M"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+      }).join(" ") + " Z")
+      .join(" ");
+    path.setAttribute("d", commands);
+    elements.parkingOverlay.append(path);
+  });
+}
+
+function renderParkingList() {
+  elements.parkingList.replaceChildren();
+  if (!state.parkingAreas.length) {
+    const empty = document.createElement("div");
+    empty.className = "poi-empty";
+    empty.textContent = "No parking areas yet. Import polygons or draw one on the map.";
+    elements.parkingList.append(empty);
+    return;
+  }
+
+  state.parkingAreas.forEach((area, index) => {
+    const card = document.createElement("article");
+    card.className = `parking-card${state.selectedParking === index ? " selected" : ""}`;
+
+    const name = document.createElement("input");
+    name.className = "parking-name";
+    name.value = area.properties.label;
+    name.setAttribute("aria-label", `Parking area ${index + 1} name`);
+    name.addEventListener("focus", () => selectParking(index, false));
+    name.addEventListener("input", () => {
+      area.properties.label = name.value || `Parking area ${index + 1}`;
+      renderParkingMapData();
+    });
+
+    const actions = document.createElement("div");
+    actions.className = "parking-actions";
+    const visibility = document.createElement("label");
+    visibility.className = "parking-visibility";
+    const visibilityInput = document.createElement("input");
+    visibilityInput.type = "checkbox";
+    visibilityInput.checked = area.properties.visible !== false;
+    const visibilityText = document.createElement("span");
+    visibilityText.textContent = "Show on map";
+    visibilityInput.addEventListener("change", () => {
+      area.properties.visible = visibilityInput.checked;
+      renderParking();
+      setMessage(`${area.properties.label} ${visibilityInput.checked ? "shown" : "hidden"}`);
+    });
+    visibility.append(visibilityInput, visibilityText);
+
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "secondary";
+    edit.textContent = state.mode === "edit-parking" && state.selectedParking === index
+      ? "Done"
+      : "Edit";
+    edit.addEventListener("click", () => {
+      const isEditing = state.mode === "edit-parking" && state.selectedParking === index;
+      state.selectedParking = index;
+      setMode(isEditing ? "view" : "edit-parking");
+      setMessage(isEditing ? "Parking editing finished" : "Drag the yellow points to edit parking");
+    });
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "delete-parking";
+    remove.textContent = "Delete";
+    remove.addEventListener("click", () => deleteParking(index));
+    actions.append(visibility, edit, remove);
+    card.append(name, actions);
+    elements.parkingList.append(card);
+  });
+}
+
+function renderParkingMapData() {
+  const source = map.getSource("parking");
+  if (!source) return;
+  source.setData({
+    type: "FeatureCollection",
+    features: state.parkingAreas
+      .map((feature, index) => ({
+        ...feature,
+        properties: {
+          ...feature.properties,
+          index,
+          selected: state.selectedParking === index,
+        },
+      }))
+      .filter((feature) => feature.properties.visible !== false),
+  });
+}
+
+function selectParking(index, rebuildList = true) {
+  state.selectedParking = index;
+  if (rebuildList) renderParking();
+  else renderParkingMapData();
+  setMessage(`Editing ${state.parkingAreas[index].properties.label}`);
+}
+
+function deleteParking(index) {
+  const label = state.parkingAreas[index].properties.label;
+  state.parkingAreas.splice(index, 1);
+  state.selectedParking = state.parkingAreas.length
+    ? Math.min(index, state.parkingAreas.length - 1)
+    : null;
+  if (state.mode === "edit-parking") setMode("view");
+  renderParking();
+  setMessage(`${label} deleted`);
+}
+
+function finishParkingDrawing() {
+  if (state.mode !== "draw-parking") return;
+  if (state.parkingDraft.length < 3) {
+    return setMessage("A parking area needs at least three points", true);
+  }
+  const index = state.parkingAreas.length;
+  const ring = [...state.parkingDraft, state.parkingDraft[0]];
+  state.parkingAreas.push({
+    type: "Feature",
+    properties: { label: `Parking area ${index + 1}`, visible: true },
+    geometry: { type: "Polygon", coordinates: [ring] },
+  });
+  state.selectedParking = index;
+  state.parkingDraft = [];
+  setMode("view");
+  setMessage(`Parking area ${index + 1} added`);
+}
+
+function cancelParkingDrawing() {
+  state.parkingDraft = [];
+  setMode("view");
+  setMessage("Parking placement cancelled");
+}
+
+function renderParkingMarkers() {
+  state.parkingMarkers.forEach((marker) => marker.remove());
+  state.parkingMarkers = [];
+  if (
+    !map.loaded()
+    || state.mode !== "edit-parking"
+    || state.selectedParking === null
+  ) return;
+  const area = state.parkingAreas[state.selectedParking];
+  const ring = area.geometry.coordinates[0];
+  ring.slice(0, -1).forEach((coordinates, vertexIndex) => {
+    const handle = document.createElement("button");
+    handle.type = "button";
+    handle.className = "parking-map-handle";
+    handle.setAttribute("aria-label", `Move parking point ${vertexIndex + 1}`);
+    const marker = new maplibregl.Marker({
+      element: handle,
+      draggable: true,
+      anchor: "center",
+    })
+      .setLngLat(coordinates)
+      .addTo(map);
+    marker.on("drag", () => {
+      const position = marker.getLngLat();
+      ring[vertexIndex] = [position.lng, position.lat];
+      if (vertexIndex === 0) ring[ring.length - 1] = [...ring[0]];
+      renderParkingMapData();
+    });
+    marker.on("dragend", () => {
+      renderParking();
+      setMessage(`Parking point ${vertexIndex + 1} moved`);
+    });
+    state.parkingMarkers.push(marker);
+  });
 }
 
 function renderPois() {
@@ -432,6 +711,7 @@ function positionPoiOverlay() {
 }
 
 function updateOverlays() {
+  updateParkingOverlay();
   updateRouteOverlay();
   positionPoiOverlay();
 }
@@ -700,7 +980,9 @@ function visiblePoiCoordinates() {
 }
 
 function parkingCoordinates() {
-  return state.parkingAreas.flatMap((feature) => feature.geometry.coordinates[0] || []);
+  return state.parkingAreas
+    .filter((feature) => feature.properties.visible !== false)
+    .flatMap((feature) => feature.geometry.coordinates[0] || []);
 }
 
 function fitContent(options = {}) {
@@ -906,7 +1188,7 @@ function legendItems() {
   if (state.route.length >= 2) {
     items.push({ type: "route", label: "Walking path" });
   }
-  if (state.parkingAreas.length) {
+  if (state.parkingAreas.some((area) => area.properties.visible !== false)) {
     items.push({ type: "parking", label: "Parking" });
   }
   state.pois.forEach((poi, index) => {
@@ -977,14 +1259,14 @@ function drawLegend(context, options) {
       context.lineWidth = 4 * scale;
       context.stroke();
     } else if (item.type === "parking") {
-      context.fillStyle = "rgba(79, 137, 198, 0.45)";
+      context.fillStyle = "rgba(244, 197, 66, 0.62)";
       context.fillRect(
         x + padding,
         rowY - 7 * scale,
         22 * scale,
         14 * scale,
       );
-      context.strokeStyle = "#356da8";
+      context.strokeStyle = "#8a6500";
       context.lineWidth = 2 * scale;
       context.strokeRect(
         x + padding,
@@ -1077,6 +1359,27 @@ function drawExportFeatures(context, mapRect, frameRect, scaleX, scaleY) {
       y: (point.y - (frameRect.top - mapRect.top)) * scaleY,
     };
   };
+
+  state.parkingAreas
+    .filter((area) => area.properties.visible !== false)
+    .forEach((area) => {
+      context.save();
+      context.beginPath();
+      area.geometry.coordinates.forEach((ring) => {
+        ring.map(exportPoint).forEach((point, index) => {
+          if (index) context.lineTo(point.x, point.y);
+          else context.moveTo(point.x, point.y);
+        });
+        context.closePath();
+      });
+      context.fillStyle = "rgba(244, 197, 66, 0.62)";
+      context.fill("evenodd");
+      context.strokeStyle = "#8a6500";
+      context.lineWidth = 3 * ((scaleX + scaleY) / 2);
+      context.setLineDash([7 * scaleX, 5 * scaleX]);
+      context.stroke();
+      context.restore();
+    });
 
   if (state.route.length >= 2) {
     const points = state.route.map(exportPoint);
