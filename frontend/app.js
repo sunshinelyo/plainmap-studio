@@ -1,6 +1,7 @@
 const state = {
   pois: [],
   route: [],
+  parkingAreas: [],
   mode: "view",
   dragIndex: null,
   draggedPoi: null,
@@ -21,6 +22,7 @@ const elements = {
   importStatus: document.querySelector("#import-status"),
   poiCount: document.querySelector("#poi-count"),
   routeCount: document.querySelector("#route-count"),
+  parkingCount: document.querySelector("#parking-count"),
   addPoi: document.querySelector("#add-poi"),
   hidePoiLabels: document.querySelector("#hide-poi-labels"),
   poiList: document.querySelector("#poi-list"),
@@ -72,7 +74,27 @@ map.on("load", () => {
   map.addSource("route", emptyCollection());
   map.addSource("route-vertices", emptyCollection());
   map.addSource("pois", emptyCollection());
+  map.addSource("parking", emptyCollection());
 
+  map.addLayer({
+    id: "parking-fill",
+    type: "fill",
+    source: "parking",
+    paint: {
+      "fill-color": "#4f89c6",
+      "fill-opacity": 0.32,
+    },
+  });
+  map.addLayer({
+    id: "parking-outline",
+    type: "line",
+    source: "parking",
+    paint: {
+      "line-color": "#356da8",
+      "line-width": 2,
+      "line-dasharray": [2, 1.5],
+    },
+  });
   map.addLayer({
     id: "route-outline",
     type: "line",
@@ -200,6 +222,9 @@ async function importFile(file) {
     elements.importStatus.textContent = `${file.name} loaded`;
     setMessage(
       `Loaded ${state.pois.length} POI${state.pois.length === 1 ? "" : "s"}`
+      + (state.parkingAreas.length
+        ? ` and ${state.parkingAreas.length} parking area${state.parkingAreas.length === 1 ? "" : "s"}`
+        : "")
       + (state.route.length ? " and 1 walking path" : ""),
     );
   } catch (error) {
@@ -286,6 +311,17 @@ function loadFeatures(features) {
 
   const line = features.find((feature) => feature.geometry?.type === "LineString");
   state.route = line ? line.geometry.coordinates.map((coordinate) => coordinate.slice(0, 2)) : [];
+  state.parkingAreas = features
+    .filter((feature) => feature.geometry?.type === "Polygon")
+    .map((feature) => ({
+      ...feature,
+      geometry: {
+        ...feature.geometry,
+        coordinates: feature.geometry.coordinates.map((ring) => (
+          ring.map((coordinate) => coordinate.slice(0, 2))
+        )),
+      },
+    }));
   state.selectedPoi = state.pois.length ? 0 : null;
   setMode("view");
   renderAll();
@@ -316,8 +352,20 @@ function finishDrawing() {
 }
 
 function renderAll() {
+  renderParking();
   renderPois();
   renderRoute();
+}
+
+function renderParking() {
+  const source = map.getSource("parking");
+  if (source) {
+    source.setData({
+      type: "FeatureCollection",
+      features: state.parkingAreas,
+    });
+  }
+  elements.parkingCount.textContent = state.parkingAreas.length;
 }
 
 function renderPois() {
@@ -651,9 +699,13 @@ function visiblePoiCoordinates() {
     .map((feature) => feature.geometry.coordinates);
 }
 
+function parkingCoordinates() {
+  return state.parkingAreas.flatMap((feature) => feature.geometry.coordinates[0] || []);
+}
+
 function fitContent(options = {}) {
-  const coordinates = visiblePoiCoordinates();
-  if (!coordinates.length) return setMessage("Show or add a POI to fit", true);
+  const coordinates = [...visiblePoiCoordinates(), ...parkingCoordinates()];
+  if (!coordinates.length) return setMessage("Show or add map content to fit", true);
   const padding = exportFramePadding();
   if (coordinates.length === 1) {
     map.easeTo({
@@ -854,6 +906,9 @@ function legendItems() {
   if (state.route.length >= 2) {
     items.push({ type: "route", label: "Walking path" });
   }
+  if (state.parkingAreas.length) {
+    items.push({ type: "parking", label: "Parking" });
+  }
   state.pois.forEach((poi, index) => {
     if (poi.properties.visible === false) return;
     items.push({
@@ -921,6 +976,22 @@ function drawLegend(context, options) {
       context.strokeStyle = state.colors.route;
       context.lineWidth = 4 * scale;
       context.stroke();
+    } else if (item.type === "parking") {
+      context.fillStyle = "rgba(79, 137, 198, 0.45)";
+      context.fillRect(
+        x + padding,
+        rowY - 7 * scale,
+        22 * scale,
+        14 * scale,
+      );
+      context.strokeStyle = "#356da8";
+      context.lineWidth = 2 * scale;
+      context.strokeRect(
+        x + padding,
+        rowY - 7 * scale,
+        22 * scale,
+        14 * scale,
+      );
     } else {
       context.beginPath();
       context.arc(x + padding + 10 * scale, rowY, 9 * scale, 0, Math.PI * 2);

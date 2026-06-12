@@ -22,7 +22,7 @@
           <span class="step">1</span>
           <div>
             <h2>Map data</h2>
-            <p>Points become POIs. The first line becomes the walking path.</p>
+            <p>Points become POIs, polygons become parking, and the first line becomes the walking path.</p>
           </div>
         </div>
         <label class="upload-button">
@@ -33,6 +33,7 @@
         <div class="metrics">
           <span><strong id="poi-count">0</strong> POIs</span>
           <span><strong id="route-count">0</strong> route points</span>
+          <span><strong id="parking-count">0</strong> parking areas</span>
         </div>
         <button id="add-poi" class="secondary full-button" type="button">Add POI on map</button>
         <label class="global-label-toggle">
@@ -125,6 +126,6 @@
   </main>
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <script src="/assets/app.js?v=22"></script>
+  <script src="/assets/app.js?v=23"></script>
 </body>
 </html>

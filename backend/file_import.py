@@ -56,9 +56,15 @@ def parse_kml(content: bytes) -> dict[str, Any]:
             if len(coordinates) >= 2:
                 features.append(feature("LineString", coordinates, label))
 
+        for polygon in elements_named(placemark, "Polygon"):
+            coordinates = polygon_coordinates(polygon)
+            if coordinates:
+                features.append(feature("Polygon", coordinates, label))
+
     if not features:
         raise ValueError(
-            "No point placemarks or walking paths were found in this file."
+            "No point placemarks, walking paths, or parking polygons were found "
+            "in this file."
         )
     return {"type": "FeatureCollection", "features": features}
 
@@ -105,6 +111,31 @@ def track_coordinates(track: ET.Element) -> list[list[float]]:
         except ValueError:
             continue
     return coordinates
+
+
+def polygon_coordinates(polygon: ET.Element) -> list[list[list[float]]]:
+    rings: list[list[list[float]]] = []
+    outer = first_descendant(polygon, "outerBoundaryIs")
+    if outer is not None:
+        ring = geometry_coordinates(outer)
+        if valid_polygon_ring(ring):
+            rings.append(close_polygon_ring(ring))
+
+    for inner in elements_named(polygon, "innerBoundaryIs"):
+        ring = geometry_coordinates(inner)
+        if valid_polygon_ring(ring):
+            rings.append(close_polygon_ring(ring))
+    return rings
+
+
+def valid_polygon_ring(coordinates: list[list[float]]) -> bool:
+    return len({tuple(point) for point in coordinates}) >= 3
+
+
+def close_polygon_ring(coordinates: list[list[float]]) -> list[list[float]]:
+    if coordinates[0] == coordinates[-1]:
+        return coordinates
+    return [*coordinates, coordinates[0]]
 
 
 def feature(kind: str, coordinates: Any, label: str) -> dict[str, Any]:

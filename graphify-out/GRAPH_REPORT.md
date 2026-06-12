@@ -4,12 +4,12 @@
 - cluster-only mode — file stats not available
 
 ## Summary
-- 78 nodes · 151 edges · 10 communities (9 shown, 1 thin omitted)
+- 84 nodes · 167 edges · 11 communities (10 shown, 1 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `4c241511`
+- Built from commit: `89b1ff08`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -24,18 +24,19 @@
 - [[_COMMUNITY_Community 7|Community 7]]
 - [[_COMMUNITY_Community 8|Community 8]]
 - [[_COMMUNITY_Community 9|Community 9]]
+- [[_COMMUNITY_Community 10|Community 10]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `parse_kml()` - 13 edges
+1. `parse_kml()` - 15 edges
 2. `parse_upload()` - 9 edges
 3. `setMessage()` - 9 edges
-4. `renderPois()` - 8 edges
-5. `exportPng()` - 8 edges
-6. `elements_named()` - 6 edges
-7. `fitContent()` - 6 edges
-8. `drawLegend()` - 6 edges
-9. `Element` - 5 edges
-10. `element_text()` - 5 edges
+4. `polygon_coordinates()` - 8 edges
+5. `renderPois()` - 8 edges
+6. `exportPng()` - 8 edges
+7. `elements_named()` - 7 edges
+8. `fitContent()` - 7 edges
+9. `Element` - 6 edges
+10. `drawLegend()` - 6 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `test_parse_kmz_prefers_doc_kml()` --calls--> `parse_upload()`  [EXTRACTED]
@@ -52,41 +53,45 @@
 ## Import Cycles
 - None detected.
 
-## Communities (10 total, 1 thin omitted)
+## Communities (11 total, 1 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.26
-Nodes (17): Any, element_text(), elements_named(), feature(), first_descendant(), geometry_coordinates(), local_name(), parse_kml() (+9 more)
+Cohesion: 0.19
+Nodes (9): bestFrameCamera(), elements, exportFramePadding(), fitContent(), FRAME_INSET, map, parkingCoordinates(), state (+1 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.19
-Nodes (8): bestFrameCamera(), elements, exportFramePadding(), fitContent(), FRAME_INSET, map, state, visiblePoiCoordinates()
+Cohesion: 0.33
+Nodes (11): Any, feature(), parse_kml(), parse_kmz(), parse_upload(), test_kml_without_supported_features_is_rejected(), test_parse_kml_returns_points_and_one_line(), test_parse_kmz_prefers_doc_kml() (+3 more)
 
 ### Community 2 - "Community 2"
+Cohesion: 0.45
+Nodes (10): close_polygon_ring(), element_text(), elements_named(), first_descendant(), geometry_coordinates(), local_name(), polygon_coordinates(), track_coordinates() (+2 more)
+
+### Community 3 - "Community 3"
 Cohesion: 0.33
 Nodes (9): addPoiAt(), deletePoi(), endPoiDrag(), pointFeature(), renderPoiList(), renderPoiOverlay(), renderPois(), selectPoi() (+1 more)
 
-### Community 3 - "Community 3"
+### Community 4 - "Community 4"
+Cohesion: 0.29
+Nodes (8): finishDrawing(), importFile(), loadFeatures(), renderAll(), renderParking(), renderRoute(), renderRouteMarkers(), setMode()
+
+### Community 5 - "Community 5"
 Cohesion: 0.29
 Nodes (4): import_file(), index(), HTMLResponse, UploadFile
 
-### Community 4 - "Community 4"
-Cohesion: 0.33
-Nodes (7): finishDrawing(), importFile(), loadFeatures(), renderAll(), renderRoute(), renderRouteMarkers(), setMode()
-
-### Community 5 - "Community 5"
+### Community 6 - "Community 6"
 Cohesion: 0.40
 Nodes (6): createLegendCanvas(), drawExportPin(), drawLegend(), drawLegendText(), legendItems(), roundedRect()
 
-### Community 6 - "Community 6"
+### Community 7 - "Community 7"
 Cohesion: 0.33
 Nodes (6): downloadCanvas(), drawCompass(), drawExportDecorations(), drawExportFeatures(), exportPng(), waitForMap()
 
-### Community 7 - "Community 7"
+### Community 8 - "Community 8"
 Cohesion: 0.40
 Nodes (5): movePoiDrag(), positionPoiOverlay(), updateOverlays(), updatePoiMapData(), updateRouteOverlay()
 
-### Community 8 - "Community 8"
+### Community 9 - "Community 9"
 Cohesion: 0.50
 Nodes (3): First version, PlainMap Studio, Run locally
 
@@ -98,9 +103,11 @@ Nodes (3): First version, PlainMap Studio, Run locally
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `parse_upload()` connect `Community 0` to `Community 3`?**
-  _High betweenness centrality (0.026) - this node is a cross-community bridge._
-- **Why does `import_file()` connect `Community 3` to `Community 0`?**
+- **Why does `parse_kml()` connect `Community 1` to `Community 2`?**
+  _High betweenness centrality (0.030) - this node is a cross-community bridge._
+- **Why does `parse_upload()` connect `Community 1` to `Community 2`, `Community 5`?**
+  _High betweenness centrality (0.025) - this node is a cross-community bridge._
+- **Why does `import_file()` connect `Community 5` to `Community 1`?**
   _High betweenness centrality (0.008) - this node is a cross-community bridge._
 - **What connects `PlainMap Studio backend package.`, `UploadFile`, `HTMLResponse` to the rest of the system?**
   _9 weakly-connected nodes found - possible documentation gaps or missing edges._

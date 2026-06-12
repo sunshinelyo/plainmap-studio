@@ -10,8 +10,8 @@
     "semantic_hash": ""
   },
   "backend/file_import.py": {
-    "mtime": 1781157317.5806787,
-    "ast_hash": "0370337264bfe151a32cc7347a3bba95",
+    "mtime": 1781233306.0592358,
+    "ast_hash": "744fae5ed5cb3eeda7239ef9bdf7621d",
     "semantic_hash": ""
   },
   "backend/main.py": {
@@ -20,8 +20,8 @@
     "semantic_hash": ""
   },
   "frontend/app.js": {
-    "mtime": 1781215949.468788,
-    "ast_hash": "9f646f42e84734ce8d43f53b95920023",
+    "mtime": 1781233335.0376053,
+    "ast_hash": "e671fdda03aa40f8cfa752ac1441415f",
     "semantic_hash": ""
   },
   "sample_data/austin_photo_walk.plainmap.json": {
@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "tests/test_file_import.py": {
-    "mtime": 1781157317.58167,
-    "ast_hash": "ac57b96705006342a99811395d104fef",
+    "mtime": 1781233306.061235,
+    "ast_hash": "0129f6283de0cf174643d43dace354cd",
     "semantic_hash": ""
   },
   ".codex/skills/graphify/SKILL.md": {
@@ -90,8 +90,8 @@
     "semantic_hash": ""
   },
   "frontend/index.html": {
-    "mtime": 1781215725.318249,
-    "ast_hash": "a8e09a6598d99f2090766ec7d19e1723",
+    "mtime": 1781233324.7892115,
+    "ast_hash": "477cd856bd5d0b649295799590af9c07",
     "semantic_hash": ""
   },
   "requirements.txt": {

@@ -70,6 +70,25 @@ def test_parse_multi_geometry_and_gx_track():
     ]
 
 
+def test_parse_parking_polygon_with_inner_ring():
+    result = parse_kml(
+        b"""<kml><Document><Placemark><name>Visitor parking</name><Polygon>
+          <outerBoundaryIs><LinearRing><coordinates>
+            -97.3,30.1 -97.2,30.1 -97.2,30.2 -97.3,30.2
+          </coordinates></LinearRing></outerBoundaryIs>
+          <innerBoundaryIs><LinearRing><coordinates>
+            -97.28,30.12 -97.24,30.12 -97.24,30.16 -97.28,30.16
+          </coordinates></LinearRing></innerBoundaryIs>
+        </Polygon></Placemark></Document></kml>"""
+    )
+
+    polygon = result["features"][0]
+    assert polygon["geometry"]["type"] == "Polygon"
+    assert polygon["properties"]["label"] == "Visitor parking"
+    assert len(polygon["geometry"]["coordinates"]) == 2
+    assert polygon["geometry"]["coordinates"][0][0] == polygon["geometry"]["coordinates"][0][-1]
+
+
 def test_kml_without_supported_features_is_rejected():
-    with pytest.raises(ValueError, match="No point placemarks"):
+    with pytest.raises(ValueError, match="parking polygons"):
         parse_kml(b"<kml><Document><Placemark><Polygon /></Placemark></Document></kml>")
