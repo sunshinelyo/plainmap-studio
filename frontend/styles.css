@@ -318,6 +318,19 @@ input[type="color"] {
   stroke-width: 4;
   filter: drop-shadow(0 2px 4px rgba(20, 33, 61, .28));
 }
+.parking-overlay-draft {
+  fill: none;
+  stroke: #8a6500;
+  stroke-width: 4;
+  stroke-dasharray: 8 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.parking-overlay-vertex {
+  fill: #ffd84d;
+  stroke: #8a6500;
+  stroke-width: 3;
+}
 
 #route-overlay {
   position: absolute;
@@ -335,6 +348,11 @@ input[type="color"] {
 }
 #route-overlay-outline { stroke: white; stroke-width: 13; }
 #route-overlay-line { stroke: var(--route-color, #f05a3c); stroke-width: 8; }
+.route-overlay-vertex {
+  fill: white;
+  stroke: var(--route-color, #f05a3c);
+  stroke-width: 3;
+}
 
 #poi-overlay {
   position: absolute;

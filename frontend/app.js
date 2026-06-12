@@ -3,6 +3,7 @@ const state = {
   route: [],
   parkingAreas: [],
   parkingDraft: [],
+  drawingCursor: null,
   mode: "view",
   dragIndex: null,
   draggedPoi: null,
@@ -47,6 +48,7 @@ const elements = {
   dropZone: document.querySelector("#drop-zone"),
   mapTip: document.querySelector("#map-tip"),
   parkingOverlay: document.querySelector("#parking-overlay"),
+  routeOverlay: document.querySelector("#route-overlay"),
   routeOverlayLine: document.querySelector("#route-overlay-line"),
   routeOverlayOutline: document.querySelector("#route-overlay-outline"),
   poiOverlay: document.querySelector("#poi-overlay"),
@@ -200,6 +202,11 @@ map.on("mousedown", "route-vertices", (event) => {
 });
 
 map.on("mousemove", (event) => {
+  if (["draw", "draw-parking"].includes(state.mode)) {
+    state.drawingCursor = [event.lngLat.lng, event.lngLat.lat];
+    if (state.mode === "draw") updateRouteOverlay();
+    else updateParkingOverlay();
+  }
   if (state.dragIndex === null) return;
   state.route[state.dragIndex] = [event.lngLat.lng, event.lngLat.lat];
   renderRoute();
@@ -393,6 +400,7 @@ function loadFeatures(features) {
 
 function setMode(mode) {
   state.mode = mode;
+  state.drawingCursor = null;
   state.dragIndex = null;
   elements.drawRoute.textContent = mode === "draw" ? "Finish path" : "Draw path";
   elements.editRoute.textContent = mode === "edit" ? "Done editing" : "Edit path";
@@ -485,6 +493,30 @@ function updateParkingOverlay() {
     path.setAttribute("d", commands);
     elements.parkingOverlay.append(path);
   });
+
+  if (state.mode === "draw-parking" && state.parkingDraft.length) {
+    const previewCoordinates = state.drawingCursor
+      ? [...state.parkingDraft, state.drawingCursor]
+      : state.parkingDraft;
+    const preview = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    const commands = previewCoordinates.map((coordinates, pointIndex) => {
+      const point = map.project(coordinates);
+      return `${pointIndex ? "L" : "M"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+    }).join(" ");
+    preview.classList.add("parking-overlay-draft");
+    preview.setAttribute("d", commands);
+    elements.parkingOverlay.append(preview);
+
+    state.parkingDraft.forEach((coordinates) => {
+      const point = map.project(coordinates);
+      const vertex = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      vertex.classList.add("parking-overlay-vertex");
+      vertex.setAttribute("cx", point.x.toFixed(1));
+      vertex.setAttribute("cy", point.y.toFixed(1));
+      vertex.setAttribute("r", "6");
+      elements.parkingOverlay.append(vertex);
+    });
+  }
 }
 
 function renderParkingList() {
@@ -933,14 +965,30 @@ function renderRoute() {
 }
 
 function updateRouteOverlay() {
-  const path = state.route
+  const previewCoordinates = state.mode === "draw" && state.drawingCursor && state.route.length
+    ? [...state.route, state.drawingCursor]
+    : state.route;
+  const path = previewCoordinates
     .map((coordinates, index) => {
       const point = map.project(coordinates);
       return `${index ? "L" : "M"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
     })
     .join(" ");
-  elements.routeOverlayOutline.setAttribute("d", state.route.length >= 2 ? path : "");
-  elements.routeOverlayLine.setAttribute("d", state.route.length >= 2 ? path : "");
+  const showPath = previewCoordinates.length >= 2;
+  elements.routeOverlayOutline.setAttribute("d", showPath ? path : "");
+  elements.routeOverlayLine.setAttribute("d", showPath ? path : "");
+  elements.routeOverlay.querySelectorAll("circle").forEach((circle) => circle.remove());
+  if (state.mode === "draw" && state.route.length) {
+    state.route.forEach((coordinates) => {
+      const point = map.project(coordinates);
+      const vertex = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      vertex.classList.add("route-overlay-vertex");
+      vertex.setAttribute("cx", point.x.toFixed(1));
+      vertex.setAttribute("cy", point.y.toFixed(1));
+      vertex.setAttribute("r", "6");
+      elements.routeOverlay.append(vertex);
+    });
+  }
 }
 
 function renderRouteMarkers() {
@@ -1135,7 +1183,7 @@ function drawExportDecorations(context, output) {
     drawLegend(context, {
       x: Math.round(output.width * 0.035),
       y: Math.round(output.height * 0.035),
-      maxWidth: Math.round(output.width * 0.44),
+      maxWidth: Math.round(output.width * 0.72),
       maxHeight: Math.round(output.height * 0.9),
       scale: Math.max(0.8, Math.min(1.5, output.width / 700)),
     });
@@ -1208,15 +1256,14 @@ function drawLegend(context, options) {
   const padding = 14 * scale;
   const titleHeight = 25 * scale;
   const rowHeight = 24 * scale;
-  const availableRows = Math.max(
+  const rowsPerColumn = Math.max(
     1,
     Math.floor((maxHeight - padding * 2 - titleHeight) / rowHeight),
   );
-  const itemLimit = items.length > availableRows ? Math.max(1, availableRows - 1) : availableRows;
-  const shownItems = items.slice(0, itemLimit);
-  const hasMore = items.length > shownItems.length;
-  const rows = shownItems.length + (hasMore ? 1 : 0);
+  const columnCount = Math.max(1, Math.ceil(items.length / rowsPerColumn));
+  const rows = Math.min(Math.max(1, items.length), rowsPerColumn);
   const width = Math.max(170 * scale, maxWidth);
+  const columnWidth = (width - padding * 2) / columnCount;
   const height = padding * 2 + titleHeight + Math.max(1, rows) * rowHeight;
 
   context.save();
@@ -1246,12 +1293,15 @@ function drawLegend(context, options) {
     return;
   }
 
-  shownItems.forEach((item, index) => {
-    const rowY = y + padding + titleHeight + index * rowHeight + rowHeight / 2;
+  items.forEach((item, index) => {
+    const column = Math.floor(index / rowsPerColumn);
+    const row = index % rowsPerColumn;
+    const columnX = x + padding + column * columnWidth;
+    const rowY = y + padding + titleHeight + row * rowHeight + rowHeight / 2;
     if (item.type === "route") {
       context.beginPath();
-      context.moveTo(x + padding, rowY);
-      context.lineTo(x + padding + 22 * scale, rowY);
+      context.moveTo(columnX, rowY);
+      context.lineTo(columnX + 22 * scale, rowY);
       context.strokeStyle = "#ffffff";
       context.lineWidth = 7 * scale;
       context.stroke();
@@ -1261,7 +1311,7 @@ function drawLegend(context, options) {
     } else if (item.type === "parking") {
       context.fillStyle = "rgba(244, 197, 66, 0.62)";
       context.fillRect(
-        x + padding,
+        columnX,
         rowY - 7 * scale,
         22 * scale,
         14 * scale,
@@ -1269,42 +1319,30 @@ function drawLegend(context, options) {
       context.strokeStyle = "#8a6500";
       context.lineWidth = 2 * scale;
       context.strokeRect(
-        x + padding,
+        columnX,
         rowY - 7 * scale,
         22 * scale,
         14 * scale,
       );
     } else {
       context.beginPath();
-      context.arc(x + padding + 10 * scale, rowY, 9 * scale, 0, Math.PI * 2);
+      context.arc(columnX + 10 * scale, rowY, 9 * scale, 0, Math.PI * 2);
       context.fillStyle = state.colors.poi;
       context.fill();
       context.fillStyle = "#ffffff";
       context.font = `900 ${9 * scale}px sans-serif`;
       context.textAlign = "center";
-      context.fillText(String(item.number), x + padding + 10 * scale, rowY);
+      context.fillText(String(item.number), columnX + 10 * scale, rowY);
     }
     drawLegendText(
       context,
       item.label,
-      x + padding + 32 * scale,
+      columnX + 32 * scale,
       rowY,
-      width - padding * 2 - 32 * scale,
+      columnWidth - 38 * scale,
       scale,
     );
   });
-
-  if (hasMore) {
-    const rowY = y + padding + titleHeight + shownItems.length * rowHeight + rowHeight / 2;
-    drawLegendText(
-      context,
-      `+${items.length - shownItems.length} more`,
-      x + padding + 32 * scale,
-      rowY,
-      width - padding * 2 - 32 * scale,
-      scale,
-    );
-  }
   context.restore();
 }
 
